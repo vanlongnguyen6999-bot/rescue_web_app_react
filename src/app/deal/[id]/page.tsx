@@ -54,8 +54,8 @@ export default function DealDetailPage() {
       } else {
         setProduct({
           ...data,
-          store: data.stores,
-        } as Product);
+          store: Array.isArray(data.stores) ? data.stores[0] : data.stores,
+        } as unknown as Product);
       }
       setLoading(false);
     };
