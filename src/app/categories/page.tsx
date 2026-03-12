@@ -68,33 +68,33 @@ function CategoriesContent() {
         <div className="h-8 w-8" />
       </header>
 
-      <div className="mb-3 flex justify-center border-b border-orange-100 bg-white">
-        <div className="-mb-px flex gap-4 px-4 text-sm font-medium text-gray-500">
-          <button type="button" onClick={() => setActiveTab("category")} className={`py-2 ${activeTab === 'category' ? 'border-b-2 border-[#FF6B00] text-[#FF6B00]' : ''}`}>Theo Loại hàng</button>
-          <button type="button" onClick={() => setActiveTab("store")} className={`py-2 ${activeTab === 'store' ? 'border-b-2 border-[#FF6B00] text-[#FF6B00]' : ''}`}>Theo Cửa hàng</button>
+      <div className="mb-4 flex justify-center border-b border-orange-100 bg-white">
+        <div className="-mb-px flex gap-8 px-4 text-base font-bold text-gray-500">
+          <button type="button" onClick={() => setActiveTab("category")} className={`py-3 transition-all ${activeTab === 'category' ? 'border-b-2 border-[#FF6B00] text-[#FF6B00]' : ''}`}>Theo Loại hàng</button>
+          <button type="button" onClick={() => setActiveTab("store")} className={`py-3 transition-all ${activeTab === 'store' ? 'border-b-2 border-[#FF6B00] text-[#FF6B00]' : ''}`}>Theo Cửa hàng</button>
         </div>
       </div>
 
-      <main className="flex-1 p-4 space-y-3">
+      <main className="flex-1 p-4 space-y-4">
         {activeTab === 'category' ? (
           categories.map(cat => (
-            <Link key={cat} href={`/?category=${cat}`} className="flex w-full items-center justify-between p-4 rounded-2xl bg-white shadow-sm border border-orange-50 hover:border-orange-200 transition-all">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">{cat === "flash_sale" ? "⚡" : "🛒"}</span>
-                <span className="font-semibold text-gray-700">{getCategoryLabel(cat)}</span>
+            <Link key={cat} href={`/?category=${cat}`} className="flex w-full items-center justify-between p-6 rounded-3xl bg-white shadow-sm border border-orange-50 hover:border-orange-200 transition-all active:scale-[0.98]">
+              <div className="flex items-center gap-4">
+                <span className="text-3xl">{cat === "flash_sale" ? "⚡" : "🛒"}</span>
+                <span className="text-lg font-bold text-gray-800">{getCategoryLabel(cat)}</span>
               </div>
-              <span className="text-orange-300">›</span>
+              <span className="text-2xl text-orange-300">›</span>
             </Link>
           ))
         ) : (
           stores.map(store => (
-            <Link key={store.id} href={`/store/${store.id}`} className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm active:scale-[0.98] transition-all">
-              <div className="h-12 w-12 flex items-center justify-center rounded-2xl bg-orange-50 text-xl">🏪</div>
+            <Link key={store.id} href={`/store/${store.id}`} className="flex items-center gap-4 rounded-3xl bg-white p-5 shadow-sm border border-orange-50 active:scale-[0.98] transition-all">
+              <div className="h-16 w-16 flex items-center justify-center rounded-2xl bg-orange-50 text-3xl">🏪</div>
               <div className="flex-1">
-                <div className="text-sm font-bold text-gray-900">{store.name}</div>
-                <div className="text-[11px] text-gray-500 line-clamp-1">{store.address}</div>
+                <div className="text-lg font-extrabold text-gray-900 mb-1">{store.name}</div>
+                <div className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{store.address}</div>
               </div>
-              <span className="text-gray-300">›</span>
+              <span className="text-2xl text-gray-300">›</span>
             </Link>
           ))
         )}
