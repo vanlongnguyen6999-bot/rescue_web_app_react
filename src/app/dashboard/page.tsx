@@ -155,7 +155,13 @@ export default function DashboardPage() {
         .eq("products.store_id", storeData.id) // Lọc đơn hàng thuộc về cửa hàng này
         .gte("created_at", todayIso);
 
-      setReservations(reservationsData ?? []);
+      // Sửa lỗi TypeScript: Ép kiểu dữ liệu trả về từ Supabase (có thể là array hoặc object)
+      const mappedReservations = (reservationsData ?? []).map((r: any) => ({
+        ...r,
+        products: Array.isArray(r.products) ? r.products[0] : r.products
+      }));
+
+      setReservations(mappedReservations);
       setLoading(false);
     };
 

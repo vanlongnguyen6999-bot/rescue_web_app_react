@@ -107,7 +107,7 @@ export default function MyOrdersPage() {
             } : null
           };
         });
-        setReservations(mappedReservations as Reservation[]);
+        setReservations(mappedReservations as unknown as Reservation[]);
       }
       setLoading(false);
     };
@@ -205,7 +205,22 @@ export default function MyOrdersPage() {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       
-      if (data) setReservations(data as Reservation[]);
+      if (data) {
+        // Sửa lỗi TypeScript: Ép kiểu dữ liệu trả về từ Supabase (có thể là array hoặc object)
+        const mappedReservations = (data ?? []).map((r: any) => {
+          const productData = Array.isArray(r.products) ? r.products[0] : r.products;
+          const storeData = productData && Array.isArray(productData.stores) ? productData.stores[0] : productData?.stores;
+          
+          return {
+            ...r,
+            products: productData ? {
+              ...productData,
+              stores: storeData || null
+            } : null
+          };
+        });
+        setReservations(mappedReservations as unknown as Reservation[]);
+      }
     }
     setSubmittingReview(null);
   };

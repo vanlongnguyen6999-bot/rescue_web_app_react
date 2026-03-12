@@ -66,9 +66,12 @@ export default function ScanPage() {
       } else if (data) {
         // Sửa lỗi TypeScript: Ép kiểu dữ liệu trả về từ Supabase (có thể là array hoặc object)
         const productData = Array.isArray(data.products) ? data.products[0] : data.products;
+        const userData = Array.isArray(data.users) ? data.users[0] : data.users;
+        
         setResult({
           ...data,
-          products: productData as any
+          products: productData as any,
+          users: userData as any
         } as ReservationDetail);
       }
     } catch {
