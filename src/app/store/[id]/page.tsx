@@ -146,18 +146,39 @@ export default function StoreDetailPage() {
         {/* Bản đồ nhỏ hoặc Xem vị trí */}
         <div 
           onClick={() => store.lat && store.lng && setShowMap(true)}
-          className="relative h-32 w-full overflow-hidden rounded-2xl bg-orange-50 border border-orange-100 cursor-pointer group"
+          className="relative h-48 w-full overflow-hidden rounded-2xl bg-orange-50 border border-orange-100 cursor-pointer group shadow-sm"
         >
-          <div className="absolute inset-0 flex items-center justify-center text-xs text-orange-400 p-4 text-center">
-            {store.address || "Chưa có bản đồ"}
-          </div>
+          {store.lat && store.lng ? (
+            <div className="h-full w-full pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
+              <DynamicMapView 
+                stores={[{
+                  ...store,
+                  deal_count: products.length,
+                  has_flash_sale: products.some(p => p.category === 'flash_sale')
+                } as any]} 
+                userCoords={null}
+              />
+            </div>
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-xs text-orange-400 p-4 text-center">
+              {store.address || "Chưa có bản đồ"}
+            </div>
+          )}
+          
           {store.lat && store.lng && (
             <>
-              <div className="absolute inset-0 bg-orange-900/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <span className="bg-white px-3 py-1.5 rounded-full text-xs font-bold text-[#FF6B00] shadow-lg">Mở bản đồ</span>
+              <div className="absolute inset-0 bg-orange-900/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
+                <span className="bg-white/90 backdrop-blur px-4 py-2 rounded-full text-xs font-bold text-[#FF6B00] shadow-lg border border-orange-100">
+                  📍 Nhấn để phóng to
+                </span>
               </div>
-              <div className="absolute bottom-2 right-2 rounded-lg bg-white/90 px-2 py-1 text-[10px] font-medium text-gray-600 shadow-sm">
-                Xem vị trí
+              <div className="absolute bottom-3 right-3 z-10">
+                <button 
+                  type="button"
+                  className="rounded-xl bg-white/95 backdrop-blur px-3 py-1.5 text-[11px] font-bold text-[#FF6B00] shadow-md border border-orange-50 active:scale-95 transition-transform"
+                >
+                  Xem vị trí
+                </button>
               </div>
             </>
           )}
