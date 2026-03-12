@@ -39,7 +39,7 @@ export default function StoreDetailPage() {
           return;
         }
 
-        // 2. Lấy đánh giá trung bình
+        // 2. Lấy đánh giá trung bình từ hàm RPC của Supabase
         const { data: ratingData, error: ratingError } = await supabase
           .rpc('get_store_rating', { p_store_id: storeId })
           .maybeSingle();
