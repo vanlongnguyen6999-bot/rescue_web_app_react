@@ -10,6 +10,8 @@ interface StoreInfoFormProps {
     address: string | null;
     lat: number | null;
     lng: number | null;
+    opening_hours: string | null;
+    business_type: string | null;
   };
   onUpdated: (store: StoreInfoFormProps["store"]) => void;
 }
@@ -17,6 +19,8 @@ interface StoreInfoFormProps {
 export function StoreInfoForm({ store, onUpdated }: StoreInfoFormProps) {
   const [name, setName] = useState(store.name);
   const [address, setAddress] = useState(store.address ?? "");
+  const [openingHours, setOpeningHours] = useState(store.opening_hours ?? "");
+  const [businessType, setBusinessType] = useState(store.business_type ?? "");
   const [lat, setLat] = useState<string>(
     store.lat != null ? String(store.lat) : ""
   );
@@ -59,11 +63,13 @@ export function StoreInfoForm({ store, onUpdated }: StoreInfoFormProps) {
         .update({
           name: name.trim() || store.name,
           address: address.trim() || null,
+          opening_hours: openingHours.trim() || null,
+          business_type: businessType.trim() || null,
           lat: latNum,
           lng: lngNum,
         })
         .eq("id", store.id)
-        .select("id, name, address, lat, lng")
+        .select("id, name, address, lat, lng, opening_hours, business_type")
         .single();
 
       if (updateError || !data) {
@@ -77,6 +83,8 @@ export function StoreInfoForm({ store, onUpdated }: StoreInfoFormProps) {
         address: data.address,
         lat: data.lat,
         lng: data.lng,
+        opening_hours: data.opening_hours,
+        business_type: data.business_type,
       });
       setSuccess("Đã lưu thông tin cửa hàng.");
     } catch {
@@ -127,6 +135,33 @@ export function StoreInfoForm({ store, onUpdated }: StoreInfoFormProps) {
           className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[#FF6B00] focus:outline-none focus:ring-1 focus:ring-[#FF6B00]"
           placeholder="Ví dụ: 123 Lê Lợi, Quận 1, TP.HCM"
         />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-gray-700">
+            Phân loại cửa hàng
+          </label>
+          <input
+            type="text"
+            value={businessType}
+            onChange={(e) => setBusinessType(e.target.value)}
+            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[#FF6B00] focus:outline-none focus:ring-1 focus:ring-[#FF6B00]"
+            placeholder="Ví dụ: Quán ăn, Tiệm bánh"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-gray-700">
+            Giờ mở cửa
+          </label>
+          <input
+            type="text"
+            value={openingHours}
+            onChange={(e) => setOpeningHours(e.target.value)}
+            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[#FF6B00] focus:outline-none focus:ring-1 focus:ring-[#FF6B00]"
+            placeholder="Ví dụ: 09:30 - 21:40"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">

@@ -8,6 +8,8 @@ export interface Store {
   address: string | null;
   lat: number | null;
   lng: number | null;
+  opening_hours: string | null;
+  business_type: string | null;
 }
 
 export interface Product {

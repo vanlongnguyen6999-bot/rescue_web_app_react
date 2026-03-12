@@ -121,20 +121,20 @@ function CategoriesContent() {
               ))
             ) : (
               stores.map(store => (
-                <button
+                <Link
                   key={store.id}
-                  onClick={() => setSelectedItem(store.id)}
-                  className="flex items-center justify-between p-4 rounded-2xl bg-white shadow-sm border border-orange-50 hover:border-orange-200 transition-all"
+                  href={`/store/${store.id}`}
+                  className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm active:scale-[0.98] transition-all"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">🏪</span>
-                    <div className="text-left">
-                      <div className="font-semibold text-gray-700">{store.name}</div>
-                      <div className="text-[10px] text-gray-400 line-clamp-1">{store.address}</div>
-                    </div>
+                  <div className="h-12 w-12 flex items-center justify-center rounded-2xl bg-orange-50 text-xl">
+                    🏪
                   </div>
-                  <span className="text-orange-300">›</span>
-                </button>
+                  <div className="flex-1">
+                    <div className="text-sm font-bold text-gray-900">{store.name}</div>
+                    <div className="text-[11px] text-gray-500 line-clamp-1">{store.address}</div>
+                  </div>
+                  <span className="text-gray-300">›</span>
+                </Link>
               ))
             )}
           </div>

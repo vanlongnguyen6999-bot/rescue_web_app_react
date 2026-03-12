@@ -12,6 +12,8 @@ interface Store {
   address: string | null;
   lat: number | null;
   lng: number | null;
+  opening_hours: string | null;
+  business_type: string | null;
 }
 
 interface ProductRow {
@@ -76,7 +78,7 @@ export default function DashboardPage() {
 
       let { data: storeRow } = await supabase
         .from("stores")
-        .select("id, name, address, lat, lng")
+        .select("id, name, address, lat, lng, opening_hours, business_type")
         .eq("owner_id", user.id)
         .maybeSingle();
 
@@ -92,7 +94,7 @@ export default function DashboardPage() {
             name: defaultName,
             is_active: true,
           })
-          .select("id, name, address, lat, lng")
+          .select("id, name, address, lat, lng, opening_hours, business_type")
           .single();
 
         storeRow = newStore as Store | null;
