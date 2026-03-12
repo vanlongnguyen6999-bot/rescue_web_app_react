@@ -206,11 +206,11 @@ export default function DealDetailPage() {
     );
   }
 
-  if (!product || error) {
+  if (!product || !product.store || error) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#FFFDF8] px-4">
         <div className="max-w-sm rounded-2xl bg-white p-4 text-center text-sm text-gray-600 shadow-md">
-          {error ?? "Không tìm thấy deal này."}
+          {error ?? "Không tìm thấy deal này hoặc cửa hàng đã đóng cửa."}
         </div>
       </div>
     );
