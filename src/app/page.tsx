@@ -1,379 +1,193 @@
- "use client";
+"use client";
 
-import { useMemo, useState, useEffect } from "react";
-import useSWR from "swr";
+import { useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { Product, ProductCategory, Store } from "@/types";
+import { Store, Product } from "@/types";
 import { ProductCard } from "@/components/ProductCard";
-import dynamic from "next/dynamic";
-import Link from "next/link";
 
-type FilterTab = "all" | "flash_sale" | "grocery";
+interface StoreDetail extends Store {
+  rating_avg?: number;
+  rating_count?: number;
+}
 
-const DynamicMapView = dynamic(
-  () => import("@/components/MapView"),
-  {
-    ssr: false,
-  }
-);
-
-const fetcher = async (): Promise<Product[]> => {
-  const today = new Date().toISOString().slice(0, 10);
-
-  const { data, error } = await supabase
-    .from("products")
-    .select(
-      `
-      id,
-      name,
-      original_price,
-      sale_price,
-      quantity,
-      expiry_date,
-      category,
-      image_url,
-      is_active,
-      created_at,
-      stores (
-        id,
-        name,
-        address,
-        lat,
-        lng
-      )
-    `
-    )
-    .eq("is_active", true)
-    .gt("quantity", 0)
-    .gte("expiry_date", today)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    // eslint-disable-next-line no-console
-    console.error(error);
-    throw error;
-  }
-
-  return (
-    data?.map((row: any) => {
-      // Sửa lỗi TypeScript: Ép kiểu dữ liệu trả về từ Supabase (có thể là array hoặc object)
-      const storeData = Array.isArray(row.stores) ? row.stores[0] : row.stores;
-      return {
-        ...row,
-        store: storeData as Store,
-      };
-    }) ?? []
-  );
-};
-
-export default function HomePage() {
-  const [filter, setFilter] = useState<FilterTab>("all");
-  const [viewMode, setViewMode] = useState<"list" | "map">("list");
-  const [search, setSearch] = useState("");
-  const [userLocation, setUserLocation] = useState<string>("Đang xác định vị trí...");
-  const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
-  const [user, setUser] = useState<any>(null);
+export default function StoreDetailPage() {
+  const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const storeId = params?.id;
+  const [store, setStore] = useState<StoreDetail | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
-    });
+    if (!storeId) return;
 
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          setUserCoords([latitude, longitude]);
-          try {
-            // Sử dụng Nominatim API của OpenStreetMap để lấy địa chỉ từ tọa độ
-            const response = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
-              {
-                headers: {
-                  "Accept-Language": "vi", // Ưu tiên tiếng Việt
-                },
-              }
-            );
-            const data = await response.json();
-            
-            // Lấy thông tin địa chỉ rút gọn (quận/huyện, tỉnh/thành phố)
-            const address = data.address;
-            const district = address.suburb || address.district || address.town || address.village || "";
-            const city = address.city || address.province || address.state || "";
-            
-            if (district && city) {
-              setUserLocation(`${district}, ${city}`);
-            } else if (city) {
-              setUserLocation(city);
-            } else {
-              setUserLocation(data.display_name.split(',')[0]);
-            }
-          } catch (error) {
-            console.error("Lỗi lấy địa chỉ:", error);
-            setUserLocation("Hồ Chí Minh, Việt Nam");
-          }
-        },
-        (error) => {
-          console.error("Lỗi Geolocation:", error);
-          setUserLocation("Vị trí chưa được cấp quyền");
+    const fetchStoreData = async () => {
+      setLoading(true);
+      try {
+        // 1. Lấy thông tin cửa hàng
+        const { data: storeData, error: storeError } = await supabase
+          .from("stores")
+          .select("*")
+          .eq("id", storeId)
+          .maybeSingle();
+
+        if (storeError || !storeData) {
+          setError("Không tìm thấy thông tin cửa hàng.");
+          return;
         }
-      );
-    } else {
-      setUserLocation("Trình duyệt không hỗ trợ vị trí");
-    }
-  }, []);
 
-  const { data, isLoading, error } = useSWR<Product[]>(
-    "products",
-    fetcher,
-    {
-      refreshInterval: 30_000,
-    }
-  );
+        // 2. Lấy đánh giá trung bình
+        const { data: reviewsData, error: reviewsError } = await supabase
+          .rpc('get_store_rating', { p_store_id: storeId })
+          .single();
 
-  const filteredProducts = useMemo(() => {
-    let list = data ?? [];
+        if (reviewsError) {
+          console.error("Error fetching store rating:", reviewsError);
+        }
 
-    if (filter !== "all") {
-      list = list.filter((p) => p.category === filter);
-    }
-
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.store.name.toLowerCase().includes(q)
-      );
-    }
-
-    return list;
-  }, [data, filter, search]);
-
-  const groupedStores = useMemo(() => {
-    const map = new Map<
-      string,
-      Store & { deal_count: number; has_flash_sale: boolean }
-    >();
-
-    (data ?? []).forEach((p) => {
-      if (!p.store) return;
-      const existing = map.get(p.store.id);
-      const base = {
-        id: p.store.id,
-        name: p.store.name,
-        address: p.store.address,
-        lat: p.store.lat,
-        lng: p.store.lng,
-      };
-      if (!existing) {
-        map.set(p.store.id, {
-          ...base,
-          deal_count: 1,
-          has_flash_sale: p.category === "flash_sale",
+        setStore({
+          ...storeData,
+          rating_avg: reviewsData?.avg_rating ?? 0,
+          rating_count: reviewsData?.review_count ?? 0,
         });
-      } else {
-        existing.deal_count += 1;
-        if (p.category === "flash_sale") {
-          existing.has_flash_sale = true;
+
+        // 3. Lấy các deal đang bán của cửa hàng
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: productsData } = await supabase
+          .from("products")
+          .select("*, stores(*)")
+          .eq("store_id", storeId)
+          .eq("is_active", true)
+          .gt("quantity", 0)
+          .gte("expiry_date", today)
+          .order("created_at", { ascending: false });
+
+        if (productsData) {
+          setProducts(productsData.map((p: any) => ({
+            ...p,
+            store: Array.isArray(p.stores) ? p.stores[0] : p.stores
+          })) as Product[]);
         }
+
+      } catch (err) {
+        console.error("Error fetching store detail:", err);
+        setError("Đã có lỗi xảy ra. Vui lòng thử lại.");
+      } finally {
+        setLoading(false);
       }
-    });
+    };
 
-    return Array.from(map.values());
-  }, [data]);
+    fetchStoreData();
+  }, [storeId]);
 
-  const renderContent = () => {
-    if (isLoading) {
-      return (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-52 animate-pulse rounded-2xl bg-orange-50"
-            />
-          ))}
-        </div>
-      );
-    }
-
-    if (error) {
-      return (
-        <div className="rounded-2xl bg-red-50 p-4 text-sm text-red-600">
-          Không tải được dữ liệu. Vui lòng thử lại sau.
-        </div>
-      );
-    }
-
-    if (!filteredProducts.length) {
-      return (
-        <div className="rounded-2xl bg-orange-50 p-4 text-sm text-orange-600">
-          Chưa có deal nào trong khu vực bạn.
-        </div>
-      );
-    }
-
+  if (loading) {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {filteredProducts.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
+      <div className="flex min-h-screen items-center justify-center bg-[#FFFDF8]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#FF6B00] border-t-transparent"></div>
       </div>
     );
-  };
+  }
+
+  if (error || !store) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#FFFDF8] px-4">
+        <div className="max-w-sm rounded-2xl bg-white p-6 text-center shadow-md">
+          <div className="mb-3 text-3xl">🏪</div>
+          <div className="text-sm font-medium text-gray-900 mb-4">{error || "Cửa hàng không tồn tại"}</div>
+          <button
+            onClick={() => router.back()}
+            className="w-full rounded-xl bg-orange-50 py-2 text-xs font-semibold text-[#FF6B00]"
+          >
+            Quay lại
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#FFFDF8]">
-      <header className="flex items-center justify-between px-4 pb-3 pt-4">
-        <div className="flex flex-col gap-1">
-          <div className="text-[11px] text-gray-500 flex items-center gap-1">
-            <span className="text-[10px]">📍</span> {userLocation}
+    <div className="flex min-h-screen flex-col bg-[#FFFDF8] pb-10">
+      <header className="flex items-center justify-between px-4 pb-3 pt-4 border-b border-orange-50 bg-white sticky top-0 z-20">
+        <button onClick={() => router.back()} className="h-8 w-8 flex items-center justify-center rounded-full bg-orange-50 text-[#FF6B00]">←</button>
+        <h1 className="text-base font-bold text-gray-900">Thông tin</h1>
+        <div className="h-8 w-8" />
+      </header>
+
+      <main className="p-4 space-y-6">
+        {/* Tên và Đánh giá */}
+        <div className="space-y-2">
+          <h2 className="text-xl font-bold text-gray-900">{store.name}</h2>
+          <div className="flex items-center gap-3 text-sm">
+            <div className="flex items-center gap-1">
+              <span className="text-yellow-400 text-lg">★</span>
+              <span className="font-bold text-gray-900">{(store.rating_avg || 0).toFixed(1)}</span>
+              <span className="text-gray-400">({store.rating_count || 0})</span>
+            </div>
+            <span className="text-gray-300">|</span>
+            <div className="flex items-center gap-1 text-gray-600">
+              <span>🕒</span>
+              <span>15-30 phút</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🍊</span>
-            <div>
-              <div className="text-base font-bold text-[#FF6B00]">
-                Food Rescue
-              </div>
-              <p className="text-[11px] text-gray-500">
-                Deal cuối ngày • Giảm tới 70%
+        </div>
+
+        {/* Bản đồ nhỏ */}
+        <div className="relative h-32 w-full overflow-hidden rounded-2xl bg-orange-50 border border-orange-100">
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-orange-400 p-4 text-center">
+            {store.address || "Chưa có bản đồ"}
+          </div>
+        </div>
+
+        {/* Thông tin chi tiết */}
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <span className="text-lg text-blue-500">📍</span>
+            <div className="flex-1">
+              <p className="text-sm text-gray-800 leading-snug">
+                {store.address || "Chưa cập nhật địa chỉ"}
               </p>
             </div>
           </div>
-        </div>
-        <Link
-          href="/auth"
-          className="text-xs font-semibold text-[#FF6B00]"
-        >
-          Đăng nhập
-        </Link>
-      </header>
 
-      <main className="flex-1 px-4 pb-20">
-        <div className="mb-3 space-y-2">
-          <div className="rounded-2xl bg-[#FF6B00] px-4 py-3 text-xs text-white shadow-md shadow-orange-300">
-            <div className="text-[10px] font-semibold uppercase tracking-wide">
-              URGENT • Sau 20:00
-            </div>
-            <div className="text-sm font-bold">
-              Flash-Sale cuối ngày • Ready-to-eat
-            </div>
-            <div className="text-[11px] text-orange-50">
-              Giải cứu ngay để tránh lãng phí thực phẩm
+          <div className="flex items-center gap-3">
+            <span className="text-lg text-blue-500">🍴</span>
+            <div className="flex-1">
+              <p className="text-sm text-gray-800">
+                Phân loại: <span className="font-medium">{store.business_type || "Chưa cập nhật"}</span>
+              </p>
             </div>
           </div>
-          <div className="rounded-full bg-white shadow-md shadow-orange-100">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm kiếm thực phẩm..."
-              className="w-full rounded-full px-4 py-2 text-sm outline-none"
-            />
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 text-blue-500">
+              <span className="text-lg">🕒</span>
+              <span className="text-sm font-medium text-gray-800">Giờ mở cửa:</span>
+            </div>
+            <div className="pl-8 flex justify-between text-sm">
+              <span className="text-gray-500">Thứ 2 - Chủ nhật</span>
+              <span className="font-bold text-gray-800">{store.opening_hours || "Chưa cập nhật"}</span>
+            </div>
           </div>
         </div>
 
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex gap-2 text-xs font-medium">
-            {[
-              { id: "all", label: "Tất cả" },
-              { id: "flash_sale", label: "Flash Sale cuối ngày" },
-              { id: "grocery", label: "Hàng cận date" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setFilter(tab.id as FilterTab)}
-                className={`rounded-full px-3 py-1 ${
-                  filter === tab.id
-                    ? "bg-[#FF6B00] text-white"
-                    : "bg-orange-50 text-[#FF6B00]"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex rounded-full bg-orange-50 text-[11px] font-medium">
-            <button
-              type="button"
-              onClick={() => setViewMode("list")}
-              className={`rounded-full px-2 py-1 ${
-                viewMode === "list"
-                  ? "bg-[#FF6B00] text-white"
-                  : "text-[#FF6B00]"
-              }`}
-            >
-              Danh sách
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("map")}
-              className={`rounded-full px-2 py-1 ${
-                viewMode === "map"
-                  ? "bg-[#FF6B00] text-white"
-                  : "text-[#FF6B00]"
-              }`}
-            >
-              Bản đồ
-            </button>
-          </div>
+        {/* Danh sách Deal của cửa hàng */}
+        <div className="pt-4 space-y-4">
+          <h3 className="text-base font-bold text-gray-900">Deal đang bán</h3>
+          {products.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3">
+              {products.map(product => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-orange-50 p-6 text-center text-sm text-orange-600">
+              Hiện cửa hàng chưa có deal nào mới.
+            </div>
+          )}
         </div>
-
-        {viewMode === "list" ? (
-          renderContent()
-        ) : (
-          <div className="h-[450px] overflow-hidden rounded-2xl bg-gray-100">
-            <DynamicMapView 
-              stores={groupedStores as any} 
-              userCoords={userCoords}
-            />
-          </div>
-        )}
       </main>
-
-      <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-orange-100 bg-white/95 px-4 py-2 text-[11px] text-gray-600 backdrop-blur">
-        <div className="mx-auto flex max-w-md items-center justify-between">
-          <Link
-            href="/"
-            className="flex flex-col items-center gap-0.5 text-[#FF6B00]"
-          >
-            <span>🏠</span>
-            <span className="font-semibold">Trang chủ</span>
-          </Link>
-          <Link
-            href="/categories"
-            className="flex flex-col items-center gap-0.5 text-gray-500"
-          >
-            <span>🧺</span>
-            <span>Danh mục</span>
-          </Link>
-          <button
-            type="button"
-            onClick={() => setViewMode("map")}
-            className="flex flex-col items-center gap-0.5 text-gray-500"
-          >
-            <span>🗺️</span>
-            <span>Bản đồ</span>
-          </button>
-          <Link
-            href={user ? "/my-orders" : "/auth"}
-            className="flex flex-col items-center gap-0.5 text-gray-500"
-          >
-            <span>🧾</span>
-            <span>Đơn hàng</span>
-          </Link>
-          <Link
-            href={user ? "/profile" : "/auth"}
-            className="flex flex-col items-center gap-0.5 text-gray-500"
-          >
-            <span>👤</span>
-            <span>{user ? "Cá nhân" : "Đăng nhập"}</span>
-          </Link>
-        </div>
-      </nav>
     </div>
   );
 }
-
