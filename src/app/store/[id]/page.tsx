@@ -6,6 +6,12 @@ import { supabase } from "@/lib/supabase";
 import { Store, Product } from "@/types";
 import { ProductCard } from "@/components/ProductCard";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+
+const DynamicMapView = dynamic(
+  () => import("@/components/MapView"),
+  { ssr: false }
+);
 
 interface StoreDetail extends Store {
   rating_avg?: number;
@@ -20,6 +26,7 @@ export default function StoreDetailPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState(false);
 
   useEffect(() => {
     if (!storeId) return;
@@ -136,17 +143,55 @@ export default function StoreDetailPage() {
           </div>
         </div>
 
-        {/* Bản đồ nhỏ (Static placeholder hoặc link) */}
-        <div className="relative h-32 w-full overflow-hidden rounded-2xl bg-orange-50 border border-orange-100">
+        {/* Bản đồ nhỏ hoặc Xem vị trí */}
+        <div 
+          onClick={() => store.lat && store.lng && setShowMap(true)}
+          className="relative h-32 w-full overflow-hidden rounded-2xl bg-orange-50 border border-orange-100 cursor-pointer group"
+        >
           <div className="absolute inset-0 flex items-center justify-center text-xs text-orange-400 p-4 text-center">
             {store.address || "Chưa có bản đồ"}
           </div>
           {store.lat && store.lng && (
-            <div className="absolute bottom-2 right-2 rounded-lg bg-white/90 px-2 py-1 text-[10px] font-medium text-gray-600 shadow-sm">
-              Xem vị trí
-            </div>
+            <>
+              <div className="absolute inset-0 bg-orange-900/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <span className="bg-white px-3 py-1.5 rounded-full text-xs font-bold text-[#FF6B00] shadow-lg">Mở bản đồ</span>
+              </div>
+              <div className="absolute bottom-2 right-2 rounded-lg bg-white/90 px-2 py-1 text-[10px] font-medium text-gray-600 shadow-sm">
+                Xem vị trí
+              </div>
+            </>
           )}
         </div>
+
+        {/* Modal Bản đồ */}
+        {showMap && store.lat && store.lng && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+            <div className="relative w-full max-w-md h-[500px] bg-white rounded-3xl overflow-hidden shadow-2xl">
+              <div className="absolute top-4 right-4 z-[110]">
+                <button 
+                  onClick={() => setShowMap(false)}
+                  className="h-10 w-10 flex items-center justify-center rounded-full bg-white text-gray-900 shadow-lg font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="h-full w-full">
+                <DynamicMapView 
+                  stores={[{
+                    ...store,
+                    deal_count: products.length,
+                    has_flash_sale: products.some(p => p.category === 'flash_sale')
+                  } as any]} 
+                  userCoords={null}
+                />
+              </div>
+              <div className="absolute bottom-0 inset-x-0 bg-white p-4 border-t border-gray-100">
+                <div className="font-bold text-gray-900 mb-1">{store.name}</div>
+                <div className="text-xs text-gray-500 line-clamp-1">{store.address}</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Thông tin chi tiết */}
         <div className="space-y-4">
