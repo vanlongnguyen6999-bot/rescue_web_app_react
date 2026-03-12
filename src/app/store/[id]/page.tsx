@@ -39,24 +39,21 @@ export default function StoreDetailPage() {
           return;
         }
 
-        // 2. Lấy đánh giá trung bình từ bảng reviews thông qua các sản phẩm của cửa hàng
-        const { data: reviewsData } = await supabase
-          .from("reviews")
-          .select("rating, products!inner(store_id)")
-          .eq("products.store_id", storeId);
+        // 2. Lấy đánh giá trung bình
+        const { data: ratingData, error: ratingError } = await supabase
+          .rpc('get_store_rating', { p_store_id: storeId })
+          .maybeSingle();
 
-        let ratingAvg = 0;
-        let ratingCount = 0;
-        if (reviewsData && reviewsData.length > 0) {
-          ratingCount = reviewsData.length;
-          const sum = reviewsData.reduce((acc, curr) => acc + curr.rating, 0);
-          ratingAvg = Math.round((sum / ratingCount) * 10) / 10;
+        if (ratingError) {
+          console.error("Error fetching store rating:", ratingError);
         }
+
+        const ratingInfo = ratingData as any;
 
         setStore({
           ...storeData,
-          rating_avg: ratingAvg,
-          rating_count: ratingCount,
+          rating_avg: ratingInfo?.avg_rating ?? 0,
+          rating_count: ratingInfo?.review_count ?? 0,
         });
 
         // 3. Lấy các deal đang bán của cửa hàng
