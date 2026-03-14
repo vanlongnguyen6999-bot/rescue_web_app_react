@@ -102,8 +102,8 @@ export default function AuthPage() {
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-md">
         <div className="mb-6 text-center">
           <div className="mb-4 flex flex-col items-center justify-center gap-2">
-            <div className="h-28 w-28 overflow-hidden rounded-3xl bg-white shadow-sm border border-orange-50">
-              <img src="/logo.png" alt="EcoEat Logo" className="h-full w-full object-cover" />
+            <div className="h-28 w-28 overflow-hidden rounded-3xl bg-white shadow-sm border border-orange-50 relative flex items-center justify-center">
+              <img src="/logo.png" alt="EcoEat Logo" className="absolute h-[150%] w-[150%] max-w-none object-contain scale-125" />
             </div>
             <div className="text-4xl font-black tracking-tight text-gray-900">
               Eco<span className="text-[#FF6B00]">Eat</span>

@@ -180,8 +180,8 @@ export default function HomePage() {
       <header className="sticky top-0 z-20 border-b border-orange-50 bg-white/95 px-4 pb-3 pt-4 backdrop-blur">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm overflow-hidden border border-orange-50">
-              <img src="/logo.png" alt="EcoEat Logo" className="h-full w-full object-cover" />
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm overflow-hidden border border-orange-50 relative">
+              <img src="/logo.png" alt="EcoEat Logo" className="absolute h-[150%] w-[150%] max-w-none object-contain scale-125" />
             </div>
             <div className="flex flex-col">
               <span className="text-xl font-black tracking-tight text-gray-900 leading-none mb-1">
