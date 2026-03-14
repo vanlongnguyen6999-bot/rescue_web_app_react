@@ -102,8 +102,8 @@ export default function AuthPage() {
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-md">
         <div className="mb-6 text-center">
           <div className="mb-4 flex flex-col items-center justify-center gap-2">
-            <img src="/logo.png" alt="EcoEat Logo" className="h-16 w-16 object-contain" />
-            <div className="text-3xl font-black tracking-tight text-gray-900">
+            <img src="/logo.png" alt="EcoEat Logo" className="h-24 w-24 object-contain" />
+            <div className="text-4xl font-black tracking-tight text-gray-900">
               Eco<span className="text-[#FF6B00]">Eat</span>
             </div>
           </div>
