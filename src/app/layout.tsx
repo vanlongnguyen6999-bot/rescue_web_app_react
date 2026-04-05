@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import BottomNav from "../components/BottomNav";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -18,11 +19,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${inter.variable} antialiased bg-[#FFFDF8] text-gray-900`}
-      >
-        {children}
+    <html lang="vi">
+      <body className={`${inter.variable} antialiased bg-[#FCFAF8] text-gray-900`} style={{ margin: 0, padding: 0 }}>
+        <div className="app-container" style={{ minHeight: '100vh', position: 'relative', paddingBottom: '80px' }}>
+          {children}
+          <BottomNav />          
+        </div>
       </body>
     </html>
   );

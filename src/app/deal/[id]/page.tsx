@@ -11,6 +11,8 @@ export default function DealDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const productId = params?.id;
+
+  // --- LOGIC STATES GIỮ NGUYÊN ---
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -25,444 +27,169 @@ export default function DealDetailPage() {
     expires_at: string;
   } | null>(null);
 
+  // --- LOGIC TIMER (LẤY TỪ SCRIPT HTML CỦA BẠN) ---
+  const [timeLeft, setTimeLeft] = useState(9 * 60 + 45); // 09:45
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+    const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
+    return () => clearInterval(timer);
+  }, [timeLeft]);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return { min: m < 10 ? `0${m}` : m, sec: s < 10 ? `0${s}` : s };
+  };
+
+  // --- LOGIC FETCH DỮ LIỆU ---
   useEffect(() => {
     if (!productId) return;
-
     const fetchProduct = async () => {
       setLoading(true);
-      setFetchError(null);
       try {
-        const { data, error } = await supabase
-          .from("products")
-          .select(
-            `
-            *,
-            stores (*)
-          `
-          )
-          .eq("id", productId)
-          .maybeSingle();
-
-        if (error) {
-          console.error("Fetch error:", error);
-          setFetchError("Lỗi khi tải dữ liệu từ hệ thống.");
-        } else if (!data) {
-          // Thử kiểm tra xem sản phẩm có tồn tại không (không join) để chẩn đoán lỗi RLS
-          const { count } = await supabase
-            .from("products")
-            .select("id", { count: 'exact', head: true })
-            .eq("id", productId);
-          
-          if (count && count > 0) {
-            setFetchError("Bạn không có quyền xem thông tin chi tiết của deal này.");
-          } else {
-            setFetchError("Không tìm thấy deal này.");
-          }
-        } else {
-          // Supabase join có thể trả về object hoặc array tùy theo cấu trúc FK
+        const { data } = await supabase.from("products").select("*, stores (*)").eq("id", productId).maybeSingle();
+        if (data) {
           const storeData = Array.isArray(data.stores) ? data.stores[0] : data.stores;
-          
-          setProduct({
-            ...data,
-            store: storeData || null,
-          } as any);
-
-          // Kiểm tra trạng thái theo dõi (chỉ khi đã đăng nhập)
+          setProduct({ ...data, store: storeData || null } as unknown as Product);
           const { data: { user } } = await supabase.auth.getUser();
           if (user && storeData?.id) {
-            const { data: followData } = await supabase
-              .from("follows")
-              .select("id")
-              .eq("user_id", user.id)
-              .eq("store_id", storeData.id)
-              .maybeSingle();
-            
-            setIsFollowing(!!followData);
+            const { data: fData } = await supabase.from("follows").select("id").eq("user_id", user.id).eq("store_id", storeData.id).maybeSingle();
+            setIsFollowing(!!fData);
           }
-        }
-      } catch (err) {
-        console.error("Unexpected error:", err);
-        setFetchError("Đã có lỗi xảy ra. Vui lòng thử lại.");
-      } finally {
-        setLoading(false);
-      }
+        } else { setFetchError("Không tìm thấy deal."); }
+      } catch { setFetchError("Lỗi hệ thống."); } finally { setLoading(false); }
     };
-
     fetchProduct();
   }, [productId]);
 
-  const handleFollow = async () => {
-    if (!product?.store?.id) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setActionError("Vui lòng đăng nhập để theo dõi cửa hàng.");
-      setTimeout(() => router.push("/auth"), 2000);
-      return;
-    }
-
-    setFollowLoading(true);
-    try {
-      if (isFollowing) {
-        // Hủy theo dõi
-        const { error } = await supabase
-          .from("follows")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("store_id", product.store?.id);
-        
-        if (!error) setIsFollowing(false);
-      } else {
-        // Theo dõi
-        const { error } = await supabase
-          .from("follows")
-          .insert({
-            user_id: user.id,
-            store_id: product.store?.id
-          });
-        
-        if (!error) setIsFollowing(true);
-      }
-    } catch (err) {
-      console.error("Follow error:", err);
-    } finally {
-      setFollowLoading(false);
-    }
-  };
-
-  const expiryInfo = useMemo(() => {
-    if (!product) return null;
-    const expiry = parseISO(product.expiry_date);
-    const hoursLeft = differenceInHours(expiry, new Date());
-    return { expiry, hoursLeft };
-  }, [product]);
-
+  // --- LOGIC GIỮ CHỖ ---
   const handleReserve = async () => {
     if (!product) return;
-    
-    // Kiểm tra đăng nhập ngay tại client
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setActionError("Vui lòng đăng nhập để thực hiện giữ chỗ.");
-      setTimeout(() => router.push("/auth"), 2000);
-      return;
-    }
-
+    if (!user) { setActionError("Vui lòng đăng nhập."); setTimeout(() => router.push("/auth"), 2000); return; }
     setSubmitting(true);
-    setActionError(null);
-
     try {
       const res = await fetch("/api/reservations", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          product_id: product.id,
-          quantity,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: product.id, quantity }),
       });
-
-      const body = await res.json().catch(() => null);
-
-      if (res.status === 401) {
-        setActionError("Vui lòng đăng nhập để thực hiện giữ chỗ.");
-        setTimeout(() => router.push("/auth"), 2000);
-        return;
-      }
-
-      // Xử lý lỗi tranh chấp (409) hoặc các lỗi khác cần refresh dữ liệu
-      if (res.status === 409 || res.status === 400) {
-        // Fetch lại sản phẩm để cập nhật số lượng mới nhất
-        const { data: updatedProduct } = await supabase
-          .from("products")
-          .select("quantity, is_active")
-          .eq("id", product.id)
-          .single();
-        
-        if (updatedProduct) {
-          setProduct(prev => prev ? { ...prev, ...updatedProduct } : null);
-        }
-        
-        setActionError(body?.message ?? "Có lỗi xảy ra. Vui lòng thử lại.");
-        return;
-      }
-
-      if (!res.ok) {
-        setActionError(body?.message ?? "Không thể giữ chỗ. Vui lòng thử lại.");
-        return;
-      }
-
-      setReservation({
-        id: body.reservation_id,
-        qr_code: body.qr_code,
-        expires_at: body.expires_at,
-      });
-      // Xóa lỗi nếu có sau khi thành công
-      setActionError(null);
-    } catch (err) {
-      console.error("Reservation error:", err);
-      setActionError("Có lỗi hệ thống. Vui lòng thử lại.");
-    } finally {
-      setSubmitting(false);
-    }
+      const body = await res.json();
+      if (res.ok) setReservation({ id: body.reservation_id, qr_code: body.qr_code, expires_at: body.expires_at });
+      else setActionError(body?.message || "Lỗi giữ chỗ.");
+    } catch { setActionError("Lỗi hệ thống."); } finally { setSubmitting(false); }
   };
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen flex-col bg-[#FFFDF8]">
-        <div className="h-64 animate-pulse bg-orange-100" />
-        <div className="space-y-3 p-4">
-          <div className="h-6 w-2/3 animate-pulse rounded bg-orange-100" />
-          <div className="h-4 w-1/2 animate-pulse rounded bg-orange-50" />
-          <div className="h-4 w-1/3 animate-pulse rounded bg-orange-50" />
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="flex min-h-screen items-center justify-center bg-[#F8F7F5]"><div className="h-8 w-8 animate-spin rounded-full border-4 border-[#FF6A00] border-t-transparent" /></div>;
+  if (!product) return <div className="p-10 text-center">{fetchError}</div>;
 
-  if (!product || fetchError) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FFFDF8] px-4">
-        <div className="max-w-sm rounded-2xl bg-white p-6 text-center shadow-md">
-          <div className="mb-3 text-3xl">🔍</div>
-          <div className="text-sm font-medium text-gray-900 mb-1">
-            {fetchError ?? "Không tìm thấy deal này"}
-          </div>
-          <p className="text-xs text-gray-500 mb-4">
-            Deal này có thể đã hết hạn hoặc đã được giải cứu hết.
-          </p>
-          <button
-            onClick={() => router.push("/")}
-            className="w-full rounded-xl bg-orange-50 py-2 text-xs font-semibold text-[#FF6B00]"
-          >
-            Quay lại trang chủ
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const discountPercent = Math.round(
-    ((product.original_price - product.sale_price) / product.original_price) *
-      100
-  );
-
-  const isAlmostExpired = !!expiryInfo && expiryInfo.hoursLeft < 24;
+  const { min, sec } = formatTime(timeLeft);
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#FFFDF8] pb-24">
-      <div className="relative h-72 w-full overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {product.image_url ? (
-          <img
-            src={product.image_url}
-            alt={product.name}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-orange-50 text-sm text-orange-400">
-            Không có ảnh
-          </div>
-        )}
-        <button
-          type="button"
-          className="absolute left-3 top-8 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-sm shadow-md"
-          onClick={() => router.back()}
-        >
-          ←
-        </button>
-      </div>
-
-      <main className="flex-1 space-y-4 px-4 pt-4">
-        <h1 className="text-lg font-bold text-gray-900">{product.name}</h1>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400 line-through">
-                {product.original_price.toLocaleString("vi-VN")}₫
-              </span>
-              <span className="text-xl font-extrabold text-[#FF6B00]">
-                {product.sale_price.toLocaleString("vi-VN")}₫
-              </span>
-            </div>
-            <div className="mt-1 flex items-center gap-2">
-              <span className="rounded-full bg-orange-50 px-2 py-0.5 text-xs font-semibold text-[#FF6B00]">
-                Tiết kiệm {discountPercent}%
-              </span>
-              {expiryInfo && (
-                <span
-                  className={`text-xs font-medium ${
-                    isAlmostExpired ? "text-red-500" : "text-orange-500"
-                  }`}
-                >
-                  HSD:{" "}
-                  {expiryInfo.expiry.toLocaleDateString("vi-VN", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                  })}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="rounded-xl bg-orange-50 px-3 py-2 text-right text-xs text-gray-700">
-            <div>Còn</div>
-            <div className="text-base font-bold text-red-500">
-              {product.quantity}
-            </div>
-            <div>suất</div>
-          </div>
-        </div>
-
-        <div className="flex items-start gap-3 rounded-2xl bg-white p-3 shadow-sm">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100 text-lg">
-            📍
-          </div>
-          <div className="flex-1 text-sm">
-            <div className="font-semibold text-gray-900">
-              {product.store?.name ?? "Cửa hàng đang cập nhật"}
-            </div>
-            <div className="text-xs text-gray-600">
-              {product.store?.address ?? "Địa chỉ đang cập nhật"}
-            </div>
-          </div>
-          <button
-            type="button"
-            disabled={followLoading || !product.store}
-            onClick={handleFollow}
-            className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all active:scale-95 ${
-              isFollowing
-                ? "bg-gray-100 text-gray-500"
-                : "bg-orange-50 text-[#FF6B00] shadow-sm"
-            } disabled:opacity-50`}
-          >
-            {followLoading ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#FF6B00] border-t-transparent" />
-            ) : isFollowing ? (
-              "Đã theo dõi"
-            ) : (
-              "+ Theo dõi"
-            )}
+    <div style={{ backgroundColor: '#F8F7F5', minHeight: '100vh', paddingBottom: '120px' }}>
+      
+      {/* HEADER - TƯƠNG ỨNG HTML */}
+      <header style={{ position: 'sticky', top: 0, height: '70px', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, borderBottom: '1px solid #F1F5F9' }}>
+        <div style={{ width: '100%', maxWidth: '1000px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px' }}>
+          <button onClick={() => router.back()} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <h1 style={{ fontSize: '18px', fontWeight: 700 }}>Thông tin giải cứu</h1>
+          <button style={{ background: 'none', border: 'none' }}>
+             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
           </button>
         </div>
+      </header>
 
-        <div className="space-y-2 rounded-2xl bg-white p-3 text-sm text-gray-700 shadow-sm">
-          <h2 className="text-sm font-semibold">Mô tả sản phẩm</h2>
-          <p className="text-xs leading-relaxed text-gray-600">
-            Combo món ngon cuối ngày được giảm giá sâu để tránh lãng phí thực
-            phẩm. Hình ảnh mang tính minh họa, bạn nhận món trực tiếp tại cửa
-            hàng.
-          </p>
+      <main style={{ width: '100%', maxWidth: '1000px', margin: '0 auto', padding: '24px 16px' }}>
+        
+        {/* TIMER BANNER - LẤY TỪ HTML GIOHANG */}
+        <div style={{ background: '#FFF7ED', padding: '20px', borderRadius: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', marginBottom: '24px', textAlign: 'center' }}>
+            <span style={{ color: '#FF6A00', fontSize: '14px', fontWeight: 600, letterSpacing: '0.5px' }}>THỜI GIAN GIỮ CHỖ CÒN LẠI</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                <div style={{ background: 'white', padding: '8px 12px', borderRadius: '8px', border: '1px solid #FFEDD5', textAlign: 'center' }}>
+                    <div style={{ fontSize: '24px', fontWeight: 700, color: '#FF6A00' }}>{min}</div>
+                    <div style={{ fontSize: '10px', color: '#64748B', textTransform: 'uppercase' }}>Phút</div>
+                </div>
+                <span style={{ color: '#FF6A00', fontSize: '24px', fontWeight: 700 }}>:</span>
+                <div style={{ background: 'white', padding: '8px 12px', borderRadius: '8px', border: '1px solid #FFEDD5', textAlign: 'center' }}>
+                    <div style={{ fontSize: '24px', fontWeight: 700, color: '#FF6A00' }}>{sec}</div>
+                    <div style={{ fontSize: '10px', color: '#64748B', textTransform: 'uppercase' }}>Giây</div>
+                </div>
+            </div>
         </div>
 
-        <div className="mt-2 flex items-center justify-between rounded-2xl bg-white p-3 text-sm shadow-sm">
-          <span className="font-medium text-gray-800">Số lượng muốn giữ</span>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() =>
-                setQuantity((q) => Math.max(1, Math.min(q - 1, product.quantity)))
-              }
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-50 text-lg text-[#FF6B00]"
-            >
-              −
-            </button>
-            <span className="w-6 text-center text-base font-semibold">
-              {quantity}
-            </span>
-            <button
-              type="button"
-              onClick={() =>
-                setQuantity((q) => Math.max(1, Math.min(q + 1, product.quantity)))
-              }
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FF6B00] text-lg text-white"
-            >
-              +
-            </button>
-          </div>
+        {/* THÔNG TIN SẢN PHẨM - TƯƠNG ỨNG COMPONENT CART ITEM TRONG HTML */}
+        <div style={{ background: 'white', borderRadius: '24px', padding: '24px', border: '1px solid #F1F5F9', display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
+            <img src={product.image_url || ""} style={{ width: '100px', height: '100px', borderRadius: '12px', objectFit: 'cover' }} />
+            <div style={{ flex: 1 }}>
+                <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '4px' }}>{product.name}</h2>
+                <div style={{ fontSize: '14px', color: '#64748B', textDecoration: 'line-through' }}>{product.original_price.toLocaleString()}đ</div>
+                <div style={{ display: 'flex', alignItems: 'center', marginTop: '4px' }}>
+                    <span style={{ fontSize: '22px', fontWeight: 800, color: '#FF6A00' }}>{product.sale_price.toLocaleString()}đ</span>
+                    <span style={{ background: '#FF6A00', color: 'white', fontSize: '11px', padding: '4px 8px', borderRadius: '6px', marginLeft: '12px' }}>
+                      -{Math.round(((product.original_price - product.sale_price) / product.original_price) * 100)}%
+                    </span>
+                </div>
+            </div>
+            
+            {/* BỘ ĐẾM SỐ LƯỢNG - CHUẨN HTML GIOHANG */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#F8F7F5', padding: '6px', borderRadius: '99px', height: 'fit-content', alignSelf: 'center' }}>
+                <button onClick={() => setQuantity(q => Math.max(1, q - 1))} style={{ width: '36px', height: '36px', borderRadius: '50%', border: 'none', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                  <svg width="12" height="2" viewBox="0 0 12 2" fill="none"><path d="M0 1H12" stroke="#475569" strokeWidth="1.5"/></svg>
+                </button>
+                <span style={{ fontWeight: 800, fontSize: '18px', padding: '0 8px' }}>{quantity}</span>
+                <button onClick={() => setQuantity(q => Math.min(product.quantity, q + 1))} style={{ width: '36px', height: '36px', borderRadius: '50%', border: 'none', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 0V12M0 6H12" stroke="#475569" strokeWidth="1.5"/></svg>
+                </button>
+            </div>
+        </div>
+
+        {/* TÓM TẮT ĐƠN HÀNG - LẤY TỪ SUMMARY SECTION HTML */}
+        <div style={{ background: 'white', padding: '24px', borderRadius: '24px', border: '1px solid #F1F5F9', marginTop: '24px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '20px' }}>Chi tiết giải cứu</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '15px' }}>
+                <span style={{ color: '#64748B' }}>Tạm tính</span>
+                <span style={{ fontWeight: 600 }}>{(product.original_price * quantity).toLocaleString()}đ</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '15px' }}>
+                <span style={{ color: '#64748B' }}>Tiết kiệm giải cứu</span>
+                <span style={{ color: '#FF6A00', fontWeight: 600 }}>-{( (product.original_price - product.sale_price) * quantity ).toLocaleString()}đ</span>
+            </div>
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '18px', fontWeight: 700 }}>Tổng cộng</span>
+                <span style={{ fontSize: '26px', fontWeight: 900, color: '#FF6A00' }}>{(product.sale_price * quantity).toLocaleString()}đ</span>
+            </div>
         </div>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-orange-100 bg-white/95 px-4 pb-4 pt-2 backdrop-blur">
-        {actionError && (
-          <div className="mb-2 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">
-            {actionError}
-          </div>
-        )}
-        <button
-          type="button"
+      {/* NÚT CHỐT ĐƠN - TƯƠNG ỨNG BTN-CHECKOUT HTML */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, width: '100%', background: 'white', padding: '20px', borderTop: '1px solid #F1F5F9', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {actionError && <div style={{ color: '#EF4444', fontSize: '12px', textAlign: 'center', fontWeight: 600 }}>{actionError}</div>}
+        <button 
           disabled={submitting || product.quantity <= 0}
           onClick={handleReserve}
-          className="flex w-full items-center justify-center rounded-2xl bg-[#FF6B00] py-3 text-sm font-semibold text-white shadow-md shadow-orange-200 disabled:cursor-not-allowed disabled:opacity-70"
+          style={{ width: '100%', padding: '18px', background: '#FF6A00', color: 'white', border: 'none', borderRadius: '14px', fontWeight: 800, fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxShadow: '0 10px 20px rgba(255, 106, 0, 0.2)' }}
         >
-          {submitting && (
-            <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-          )}
-          Giữ chỗ ngay
+          <svg width="22" height="16" viewBox="0 0 22 16" fill="none"><path d="M13 9C12.1667 9 11.4583 8.70833 10.875 8.125C10.2917 7.54167 10 6.83333 10 6C10 5.16667 10.2917 4.45833 10.875 3.875C11.4583 3.29167 12.1667 3 13 3C13.8333 3 14.5417 3.29167 15.125 3.875C15.7083 4.45833 16 5.16667 16 6C16 6.83333 15.7083 7.54167 15.125 8.125C14.5417 8.70833 13.8333 9 13 9ZM6 12C5.45 12 4.97917 11.8042 4.5875 11.4125C4.19583 11.0208 4 10.55 4 10V2C4 1.45 4.19583 0.979167 4.5875 0.5875C4.97917 0.195833 5.45 0 6 0H20C20.55 0 21.0208 0.195833 21.4125 0.5875C21.8042 0.979167 22 1.45 22 2V10C22 10.55 21.8042 11.0208 21.4125 11.4125C21.0208 11.8042 20.55 12 20 12H6ZM8 10H18C18 9.45 18.1958 8.97917 18.5875 8.5875C18.9792 8.19583 19.45 8 20 8V4C19.45 4 18.9792 3.80417 18.5875 3.4125C18.1958 3.02083 18 2.55 18 2H8C8 2.55 7.80417 3.02083 7.4125 3.4125C7.02083 3.80417 6.55 4 6 4V8C6.55 8 7.02083 8.19583 7.4125 8.5875C7.80417 8.97917 8 9.45 8 10ZM19 16H2C1.45 16 0.979167 15.8042 0.5875 15.4125C0.195833 15.0208 0 14.55 0 14V3H2V14H19V16ZM6 10V2V10Z" fill="white"/></svg>
+          {submitting ? "Đang xử lý..." : "Giữ chỗ & Thanh toán tại quầy"}
         </button>
       </div>
 
-      {/* QR Code Modal */}
+      {/* QR MODAL (KẾT QUẢ THÀNH CÔNG) */}
       {reservation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div className="flex flex-col items-center p-6 text-center">
-              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-3xl">
-                ✅
-              </div>
-              <h3 className="text-xl font-bold text-gray-900">Giữ chỗ thành công!</h3>
-              <p className="mt-1 text-xs text-gray-500">
-                Hãy đưa mã này cho nhân viên cửa hàng để nhận món.
-              </p>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ background: 'white', width: '100%', maxWidth: '400px', borderRadius: '32px', padding: '32px', textAlign: 'center' }}>
+            <h3 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '24px' }}>Giữ chỗ thành công! ✅</h3>
+            <div style={{ padding: '24px', background: '#F8F7F5', borderRadius: '24px', marginBottom: '24px' }}>
+                <QRCode value={reservation.qr_code} size={180} style={{ margin: '0 auto' }} />
+                <div style={{ marginTop: '16px', fontWeight: 900, color: '#FF6A00', fontSize: '18px' }}>{reservation.qr_code.toUpperCase()}</div>
             </div>
-
-            <div className="mx-6 mb-6 flex flex-col items-center gap-4 rounded-3xl bg-orange-50 p-6">
-              <div className="w-full max-w-[200px] rounded-2xl bg-white p-4 shadow-sm">
-                <QRCode
-                  value={String(reservation.qr_code)}
-                  size={256}
-                  style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                  viewBox={`0 0 256 256`}
-                  bgColor="#FFFFFF"
-                  fgColor="#000000"
-                />
-              </div>
-              <div className="text-center">
-                <div className="text-sm font-bold text-[#FF6B00]">
-                  Mã: {reservation.qr_code.slice(0, 8).toUpperCase()}
-                </div>
-                <div className="mt-1 text-[11px] text-gray-500">
-                  Hết hạn lúc: {new Date(reservation.expires_at).toLocaleTimeString("vi-VN", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-50 p-4">
-              <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() => router.push("/my-orders")}
-                  className="w-full rounded-2xl bg-[#FF6B00] py-3 text-sm font-semibold text-white shadow-md shadow-orange-200 active:scale-[0.98]"
-                >
-                  Xem đơn của tôi
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setReservation(null)}
-                  className="w-full py-2 text-sm font-medium text-gray-400 active:text-gray-600"
-                >
-                  Đóng
-                </button>
-              </div>
-            </div>
+            <button onClick={() => router.push("/my-orders")} style={{ width: '100%', padding: '16px', borderRadius: '12px', background: '#FF6A00', color: 'white', fontWeight: 700, border: 'none', cursor: 'pointer' }}>Xem đơn của tôi</button>
+            <button onClick={() => setReservation(null)} style={{ marginTop: '12px', background: 'none', border: 'none', color: '#94A3B8', fontWeight: 600, cursor: 'pointer' }}>Đóng</button>
           </div>
         </div>
       )}
     </div>
   );
 }
-

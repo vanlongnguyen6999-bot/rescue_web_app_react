@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import QRCode from "react-qr-code";
+import QRCode from "react-qr-code"; // Đảm bảo đã npm install react-qr-code
 import { supabase } from "@/lib/supabase";
+import Link from "next/link";
 
 type ReservationStatus = "Reserved" | "Completed" | "Expired";
 
@@ -34,92 +35,49 @@ interface Reservation {
 type Tab = "ongoing" | "completed" | "review";
 
 export default function MyOrdersPage() {
+  const [showQR, setShowQR] = useState(false);
+  const [selectedCode, setSelectedCode] = useState("");
   const router = useRouter();
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState<Tab>("ongoing");
   const [submittingReview, setSubmittingReview] = useState<string | null>(null);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(new Date());
-    }, 1000);
+    const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/auth"); return; }
 
-      if (!user) {
-        router.push("/auth");
-        return;
-      }
-
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("reservations")
-        .select(
-          `
-          id,
-          quantity,
-          qr_code,
-          status,
-          expires_at,
-          created_at,
-          products (
-            id,
-            name,
-            sale_price,
-            image_url,
-            stores (
-              id,
-              name,
-              address
-            )
-          ),
-          reviews (
-            rating,
-            comment
-          )
-        `
-        )
-        .eq("user_id", user.id) // Chỉ lấy đơn hàng của người dùng hiện tại
+        .select(`id, quantity, qr_code, status, expires_at, created_at,
+          products (id, name, sale_price, image_url, stores (id, name, address)),
+          reviews (rating, comment)`)
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
-
-      if (error) {
-        setError("Không tải được danh sách đơn.");
-      } else {
-        // Sửa lỗi TypeScript: Ép kiểu dữ liệu trả về từ Supabase (có thể là array hoặc object)
-        const mappedReservations = (data ?? []).map((r: any) => {
-          const productData = Array.isArray(r.products) ? r.products[0] : r.products;
-          const storeData = productData && Array.isArray(productData.stores) ? productData.stores[0] : productData?.stores;
-          
-          return {
-            ...r,
-            products: productData ? {
-              ...productData,
-              stores: storeData || null
-            } : null
-          };
-        });
-        setReservations(mappedReservations as unknown as Reservation[]);
-      }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mapped = (data ?? []).map((r: any) => {
+        const productData = Array.isArray(r.products) ? r.products[0] : r.products;
+        const storeData = productData && Array.isArray(productData.stores) ? productData.stores[0] : productData?.stores;
+        return { ...r, products: productData ? { ...productData, stores: storeData || null } : null };
+      });
+      setReservations(mapped as unknown as Reservation[]);
       setLoading(false);
     };
-
     load();
   }, [router]);
 
   const withComputedStatus = useMemo(() => {
     return reservations.map((r) => {
       if (r.status === "Reserved" && r.expires_at) {
-        const exp = new Date(r.expires_at);
-        if (exp.getTime() <= now.getTime()) {
+        if (new Date(r.expires_at).getTime() <= now.getTime()) {
           return { ...r, status: "Expired" as ReservationStatus };
         }
       }
@@ -127,300 +85,144 @@ export default function MyOrdersPage() {
     });
   }, [reservations, now]);
 
-  const filteredReservations = useMemo(() => {
-    if (activeTab === "ongoing") {
-      return withComputedStatus.filter(r => r.status === "Reserved");
-    }
-    if (activeTab === "completed") {
-      return withComputedStatus.filter(r => r.status === "Completed" || r.status === "Expired");
-    }
-    // Tạm thời tab Đánh giá sẽ hiển thị các đơn đã hoàn thành
-    if (activeTab === "review") {
-      return withComputedStatus.filter(r => r.status === "Completed");
-    }
+  const ongoingOrders = useMemo(() => withComputedStatus.filter(r => r.status === "Reserved"), [withComputedStatus]);
+  const completedOrders = useMemo(() => withComputedStatus.filter(r => r.status === "Completed" || r.status === "Expired"), [withComputedStatus]);
+  
+  const filteredByTab = useMemo(() => {
+    if (activeTab === "ongoing") return ongoingOrders;
+    if (activeTab === "completed") return completedOrders;
+    if (activeTab === "review") return withComputedStatus.filter(r => r.status === "Completed");
     return [];
-  }, [withComputedStatus, activeTab]);
-
-  const getStatusBadge = (status: ReservationStatus) => {
-    if (status === "Reserved") {
-      return {
-        label: "Đang giữ chỗ",
-        className: "bg-orange-50 text-[#FF6B00]",
-      };
-    }
-    if (status === "Completed") {
-      return {
-        label: "Đã nhận hàng",
-        className: "bg-emerald-50 text-emerald-600",
-      };
-    }
-    return {
-      label: "Hết hạn",
-      className: "bg-gray-100 text-gray-500",
-    };
-  };
-
-  const renderCountdown = (reservation: Reservation) => {
-    if (reservation.status !== "Reserved" || !reservation.expires_at) return null;
-    const exp = new Date(reservation.expires_at);
-    const diffMs = exp.getTime() - now.getTime();
-    if (diffMs <= 0) return <span className="text-xs text-red-500">Đã hết hạn</span>;
-
-    const totalSec = Math.floor(diffMs / 1000);
-    const minutes = Math.floor(totalSec / 60);
-    const seconds = totalSec % 60;
-
-    return (
-      <span className="text-xs font-medium text-red-500">
-        Hết hạn sau{" "}
-        {minutes.toString().padStart(2, "0")}:
-        {seconds.toString().padStart(2, "0")}
-      </span>
-    );
-  };
+  }, [ongoingOrders, completedOrders, withComputedStatus, activeTab]);
 
   const handleRate = async (reservationId: string, productId: string, rating: number) => {
     setSubmittingReview(reservationId);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-
-    const { error } = await supabase.from("reviews").insert({
-      user_id: user.id,
-      product_id: productId,
-      reservation_id: reservationId,
-      rating: rating,
-    });
-
-    if (error) {
-      alert("Không thể gửi đánh giá: " + error.message);
-    } else {
-      // Refresh danh sách
-      const { data } = await supabase
-        .from("reservations")
-        .select(`
-          id, quantity, qr_code, status, expires_at, created_at,
-          products (id, name, sale_price, image_url, stores (id, name, address)),
-          reviews (rating, comment)
-        `)
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      
-      if (data) {
-        // Sửa lỗi TypeScript: Ép kiểu dữ liệu trả về từ Supabase (có thể là array hoặc object)
-        const mappedReservations = (data ?? []).map((r: any) => {
-          const productData = Array.isArray(r.products) ? r.products[0] : r.products;
-          const storeData = productData && Array.isArray(productData.stores) ? productData.stores[0] : productData?.stores;
-          
-          return {
-            ...r,
-            products: productData ? {
-              ...productData,
-              stores: storeData || null
-            } : null
-          };
-        });
-        setReservations(mappedReservations as unknown as Reservation[]);
-      }
-    }
+    await supabase.from("reviews").insert({ user_id: user.id, product_id: productId, reservation_id: reservationId, rating });
+    setReservations(prev => prev.map(r => r.id === reservationId ? { ...r, reviews: [{ rating, comment: null }] } : r));
     setSubmittingReview(null);
   };
 
+  if (loading) return (
+    <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FCFAF8' }}>
+      <div style={{ width: '32px', height: '32px', border: '4px solid #FF6A00', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+
   return (
-    <div className="flex min-h-screen flex-col bg-[#FFFDF8] pb-4">
-      <header className="flex items-center justify-between px-4 pb-3 pt-4">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-sm"
-        >
-          ←
+    <div style={{ backgroundColor: '#FCFAF8', minHeight: '100vh', paddingBottom: '100px', fontFamily: 'sans-serif' }}>
+      
+      {/* POPUP MÃ QR TO ĐỂ DEMO */}
+      {showQR && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', padding: '20px' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '32px', padding: '32px', width: '100%', maxWidth: '340px', textAlign: 'center', position: 'relative' }}>
+            <button onClick={() => setShowQR(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', fontSize: '24px', color: '#CBD5E1', cursor: 'pointer' }}>✕</button>
+            <h3 style={{ fontSize: '20px', fontWeight: 900, color: '#0F172A', marginBottom: '8px' }}>MÃ XÁC NHẬN</h3>
+            <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '24px' }}>Đưa mã này cho chủ quán để lấy món nhé!</p>
+            <div style={{ background: '#F8FAFC', padding: '20px', borderRadius: '24px', display: 'inline-block', border: '2px solid #F1F5F9', marginBottom: '20px' }}>
+              <QRCode 
+            value={selectedCode} 
+            size={160} 
+            style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+            viewBox={`0 0 256 256`}
+         />
+            </div>
+            <div style={{ background: '#0F172A', padding: '15px', borderRadius: '16px', color: 'white' }}>
+              <span style={{ fontSize: '24px', fontWeight: 900, letterSpacing: '6px' }}>{selectedCode}</span>
+            </div>
+            <button onClick={() => setShowQR(false)} style={{ marginTop: '24px', width: '100%', padding: '12px', background: 'none', border: 'none', color: '#94A3B8', fontWeight: 700, fontSize: '13px', textTransform: 'uppercase' }}>Đóng lại</button>
+          </div>
+        </div>
+      )}
+
+      {/* HEADER */}
+      <header style={{ position: 'sticky', top: 0, height: '70px', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', borderBottom: '1px solid #F1F5F9', zIndex: 100 }}>
+        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2.5"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <h1 className="text-base font-bold text-gray-900">Đơn của tôi</h1>
-        <div className="h-8 w-8" />
+        <div style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', textTransform: 'uppercase' }}>Đơn hàng của tôi</div>
+        <div style={{ width: '24px' }} />
       </header>
 
-      {/* Tabs */}
-      <div className="mb-3 flex justify-center border-b border-orange-100">
-        <div className="-mb-px flex gap-4 px-4 text-sm font-medium text-gray-500">
-          <button 
-            type="button"
-            onClick={() => setActiveTab("ongoing")}
-            className={`py-2 ${activeTab === 'ongoing' ? 'border-b-2 border-[#FF6B00] text-[#FF6B00]' : ''}`}>
-            Đang thực hiện
-          </button>
-          <button 
-            type="button"
-            onClick={() => setActiveTab("completed")}
-            className={`py-2 ${activeTab === 'completed' ? 'border-b-2 border-[#FF6B00] text-[#FF6B00]' : ''}`}>
-            Đã hoàn thành
-          </button>
-          <button 
-            type="button"
-            onClick={() => setActiveTab("review")}
-            className={`py-2 ${activeTab === 'review' ? 'border-b-2 border-[#FF6B00] text-[#FF6B00]' : ''}`}>
-            Đánh giá
-          </button>
-        </div>
+      {/* TABS */}
+      <div style={{ display: 'flex', background: 'white', borderBottom: '1px solid #F1F5F9', position: 'sticky', top: '70px', zIndex: 99 }}>
+        <button onClick={() => setActiveTab("ongoing")} style={{ flex: 1, padding: '16px 0', fontSize: '11px', fontWeight: 900, color: activeTab === 'ongoing' ? '#FF6A00' : '#94A3B8', border: 'none', background: 'none', borderBottom: activeTab === 'ongoing' ? '3px solid #FF6A00' : '3px solid transparent' }}>CHỜ LẤY</button>
+        <button onClick={() => setActiveTab("completed")} style={{ flex: 1, padding: '16px 0', fontSize: '11px', fontWeight: 900, color: activeTab === 'completed' ? '#FF6A00' : '#94A3B8', border: 'none', background: 'none', borderBottom: activeTab === 'completed' ? '3px solid #FF6A00' : '3px solid transparent' }}>LỊCH SỬ</button>
+        <button onClick={() => setActiveTab("review")} style={{ flex: 1, padding: '16px 0', fontSize: '11px', fontWeight: 900, color: activeTab === 'review' ? '#FF6A00' : '#94A3B8', border: 'none', background: 'none', borderBottom: activeTab === 'review' ? '3px solid #FF6A00' : '3px solid transparent' }}>ĐÁNH GIÁ</button>
       </div>
 
-      <main className="flex-1 space-y-3 px-4">
-        {loading && (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-32 animate-pulse rounded-2xl bg-orange-50"
-              />
-            ))}
-          </div>
-        )}
-
-        {!loading && error && (
-          <div className="rounded-2xl bg-red-50 p-3 text-sm text-red-600">
-            {error}
-          </div>
-        )}
-
-        {!loading && !error && !filteredReservations.length && (
-          <div className="rounded-2xl bg-orange-50 p-4 text-center text-sm text-orange-600">
-            Không có đơn hàng nào trong mục này.
-          </div>
-        )}
-
-        {!loading &&
-          !error &&
-          filteredReservations.map((r) => {
-            const badge = getStatusBadge(r.status);
-            const product = r.products;
-            const store = product?.stores ?? null;
-            const isActiveReserved =
-              r.status === "Reserved" && !!r.expires_at && new Date(r.expires_at) > now;
-            const review = r.reviews && r.reviews.length > 0 ? r.reviews[0] : null;
-
-            return (
-              <div
-                key={r.id}
-                className="space-y-3 rounded-2xl bg-white p-3 text-sm shadow-sm"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="h-16 w-16 overflow-hidden rounded-2xl bg-orange-50">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    {product?.image_url ? (
-                      <img
-                        src={product.image_url}
-                        alt={product.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-[10px] text-orange-400">
-                        Không có ảnh
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="text-sm font-semibold text-gray-900">
-                          {product?.name ?? "Sản phẩm đã xóa"}
-                        </div>
-                        {store && (
-                          <div className="text-[11px] text-gray-500">
-                            {store.name} • {store.address}
-                          </div>
-                        )}
-                      </div>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}
-                      >
-                        {badge.label}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-gray-600">
-                      <span>
-                        Số lượng:{" "}
-                        <span className="font-semibold text-gray-800">
-                          {r.quantity}
-                        </span>
-                      </span>
-                      {renderCountdown(r)}
-                    </div>
-                    <div className="text-[11px] text-gray-400">
-                      Giữ lúc{" "}
-                      {new Date(r.created_at).toLocaleString("vi-VN", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        day: "2-digit",
-                        month: "2-digit",
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Phần đánh giá */}
-                {activeTab === "review" && product && (
-                  <div className="mt-2 border-t border-orange-50 pt-3">
-                    {review ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500 font-medium">Bạn đã đánh giá:</span>
-                        <div className="flex gap-0.5">
-                          {[1, 2, 3, 4, 5].map((s) => (
-                            <span key={s} className={`text-sm ${s <= review.rating ? 'text-yellow-400' : 'text-gray-200'}`}>
-                              ★
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-2">
-                        <div className="text-xs text-gray-500 font-medium">Hãy để lại đánh giá của bạn:</div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex gap-2">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <button
-                                key={star}
-                                type="button"
-                                disabled={submittingReview === r.id}
-                                onClick={() => handleRate(r.id, product.id, star)}
-                                className="text-2xl text-gray-200 transition-colors hover:text-yellow-400 focus:text-yellow-400 active:scale-95"
-                              >
-                                ★
-                              </button>
-                            ))}
-                          </div>
-                          {submittingReview === r.id && (
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#FF6B00] border-t-transparent" />
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {isActiveReserved && (
-                  <div className="mt-2 flex flex-col items-center gap-2 rounded-2xl bg-orange-50 p-3">
-                    <div className="text-center">
-                      <div className="text-xs font-semibold text-[#FF6B00]">
-                        Đưa mã này cho nhân viên quét
-                      </div>
-                      <div className="mt-1 text-sm font-bold text-gray-800 tracking-wider">
-                        {r.qr_code.slice(0, 8).toUpperCase()}
-                      </div>
-                    </div>
-                    <div className="rounded-2xl bg-white p-3 shadow-sm">
-                      <QRCode
-                        value={r.qr_code}
-                        size={160}
-                        bgColor="#FFFFFF"
-                        fgColor="#000000"
-                      />
-                    </div>
-                  </div>
-                )}
+      <main style={{ padding: '20px' }}>
+        {filteredByTab.length === 0 ? (
+          <div style={{ textAlign: 'center', marginTop: '100px', opacity: 0.3 }}><p style={{ fontWeight: 900 }}>CHƯA CÓ ĐƠN HÀNG</p></div>
+        ) : (
+          filteredByTab.map((order) => (
+            <div key={order.id} style={{ background: 'white', borderRadius: '28px', padding: '20px', marginBottom: '16px', border: '1px solid #F1F5F9', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center' }}>
+                <span style={{ fontSize: '10px', fontWeight: 900, color: '#94A3B8' }}>📍 {order.products?.stores?.name}</span>
+                <span style={{ fontSize: '9px', fontWeight: 900, padding: '4px 8px', borderRadius: '99px', background: order.status === 'Reserved' ? '#FF6A001a' : '#F1F5F9', color: order.status === 'Reserved' ? '#FF6A00' : '#94A3B8' }}>{order.status}</span>
               </div>
-            );
-          })}
+
+              <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+                <img src={order.products?.image_url?.startsWith('http') ? order.products.image_url : `/${order.products?.image_url}`} style={{ width: '70px', height: '70px', borderRadius: '20px', objectFit: 'cover' }} alt="" />
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: 900, margin: 0 }}>{order.products?.name}</h3>
+                  <p style={{ color: '#FF6A00', fontWeight: 900, fontSize: '16px', marginTop: '4px' }}>{order.products?.sale_price.toLocaleString()}đ</p>
+                </div>
+              </div>
+
+              {order.status === "Reserved" && (
+                <button 
+                  onClick={() => { setSelectedCode(order.qr_code); setShowQR(true); }}
+                  style={{ width: '100%', padding: '14px', background: '#10B981', color: 'white', border: 'none', borderRadius: '16px', fontWeight: 900, fontSize: '13px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}
+                >
+                   BẤM ĐỂ HIỆN MÃ NHẬN HÀNG
+                </button>
+              )}
+
+              {order.status === "Completed" && (
+                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '15px', display: 'flex', justifyContent: 'center', gap: '12px' }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button key={star} onClick={() => order.products && handleRate(order.id, order.products.id, star)} disabled={!!order.reviews?.length} style={{ fontSize: '24px', background: 'none', border: 'none', opacity: (order.reviews?.[0]?.rating || 0) >= star ? 1 : 0.2, cursor: 'pointer' }}>⭐</button>
+                  ))}
+                </div>
+              )}
+
+              {order.status === "Reserved" && order.expires_at && (
+                <div style={{ marginTop: '12px', fontSize: '10px', fontWeight: 900, color: '#EF4444', textAlign: 'center' }}>
+                  ⏱ HẾT HẠN SAU: {Math.max(0, Math.floor((new Date(order.expires_at).getTime() - now.getTime()) / 60000))} PHÚT
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </main>
+
+      {/* BOTTOM NAV GỐC */}
+      <nav style={{ position: 'fixed', bottom: 0, left: 0, width: '100%', height: '75px', background: 'white', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-around', alignItems: 'center', paddingBottom: '10px', zIndex: 1000 }}>
+        <Link href="/" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: '10px', color: '#94A3B8', gap: '4px', textDecoration: 'none', flex: 1 }}>
+          <svg width="24" height="24" viewBox="0 0 16 18" fill="none"><path d="M2 16H5V10H11V16H14V7L8 2.5L2 7V16ZM0 18V6L8 0L16 6V18H9V12H7V18H0Z" fill="currentColor"/></svg>
+          <span>Trang chủ</span>
+        </Link>
+        <Link href="/categories" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: '10px', color: '#94A3B8', gap: '4px', textDecoration: 'none', flex: 1 }}>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M0 8V0H8V8H0ZM0 18V10H8V18H0ZM10 8V0H18V8H10ZM10 18V10H18V18H10ZM2 6H6V2H2V6ZM12 6H16V2H12V6ZM12 16H16V12H12V16ZM2 16H6V12H2V16Z" fill="currentColor"/></svg>
+          <span>Danh mục</span>
+        </Link>
+        <Link href="/map" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: '10px', color: '#94A3B8', gap: '4px', textDecoration: 'none', flex: 1 }}>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M12 18L6 15.9L1.35 17.7C1.01667 17.8333 0.708333 17.7958 0.425 17.5875C0.141667 17.3792 0 17.1 0 16.75V2.75C0 2.53333 0.0625 2.34167 0.1875 2.175C0.3125 2.00833 0.483333 1.88333 0.7 1.8L6 0L12 2.1L16.65 0.3C16.9833 0.166667 17.2917 0.204167 17.575 0.4125C17.8583 0.620833 18 0.9 18 1.25V15.25C18 15.4667 17.9375 15.6583 17.8125 15.825C17.6875 15.9917 17.5167 16.1167 17.3 16.2L12 18Z" fill="currentColor"/></svg>
+          <span>Bản đồ</span>
+        </Link>
+        <Link href="/my-orders" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: '10px', color: '#FF6A00', gap: '4px', textDecoration: 'none', flex: 1 }}>
+          <svg width="18" height="20" viewBox="0 0 18 20" fill="none"><path d="M3 20C2.16667 20 1.45833 19.7083 0.875 19.125C0.291667 18.5417 0 17.8333 0 17V14H3V0L4.5 1.5L6 0L7.5 1.5L9 0L10.5 1.5L12 0L13.5 1.5L15 0L16.5 1.5L18 0V17C18 17.8333 17.7083 18.5417 17.125 19.125C16.5417 19.7083 15.8333 20 15 20H3ZM15 18C15.2833 18 15.5208 17.9042 15.7125 17.7125C15.9042 17.5208 16 17.2833 16 17V3H5V14H14V17C14 17.2833 14.0958 17.5208 14.2875 17.7125C14.4792 17.9042 14.7167 18 15 18ZM6 7V5H12V7H6ZM6 10V8H12V10H6Z" fill="currentColor"/></svg>
+          <span>Đơn hàng</span>
+        </Link>
+        <Link href="/profile" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: '10px', color: '#94A3B8', gap: '4px', textDecoration: 'none', flex: 1 }}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 8C6.9 8 5.95833 7.60833 5.175 6.825C4.39167 6.04167 4 5.1 4 4C4 2.9 4.39167 1.95833 5.175 1.175C5.95833 0.391667 6.9 0 8 0C9.1 0 10.0417 0.391667 10.825 1.175C11.6083 1.95833 12 2.9 12 4C12 5.1 11.6083 6.04167 10.825 6.825C10.0417 7.60833 9.1 8 8 8ZM0 16V13.2C0 12.6333 0.145833 12.1125 0.4375 11.6375C0.729167 11.1625 1.11667 10.8 1.6 10.55C2.63333 10.0333 3.68333 9.64583 4.75 9.3875C5.81667 9.12917 6.9 9 8 9C9.1 9 10.1833 9.12917 11.25 9.3875C12.3167 9.64583 13.3667 10.0333 14.4 10.55C14.8833 10.8 15.2708 11.1625 15.5625 11.6375C15.8542 12.1125 16 12.6333 16 13.2V16H0Z" fill="currentColor"/></svg>
+          <span>Cá nhân</span>
+        </Link>
+      </nav>
     </div>
   );
 }
-

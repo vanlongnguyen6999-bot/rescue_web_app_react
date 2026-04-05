@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 
+interface UserMetadata {
+  full_name?: string;
+  name?: string;
+  role?: string;
+}
 export async function POST() {
   const supabase = await createServerSupabaseClient();
 
@@ -13,15 +18,9 @@ export async function POST() {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const fullName =
-    (user.user_metadata as any)?.full_name ??
-    (user.user_metadata as any)?.name ??
-    null;
-  const role =
-    (user.user_metadata as any)?.role ??
-    "store_owner";
-
-  // Đảm bảo có bản ghi trong bảng users
+  const metadata = user.user_metadata as UserMetadata;
+  const fullName = metadata?.full_name ?? metadata?.name ?? null;
+  const role = metadata?.role ?? 'store_owner'; 
   await supabase
     .from("users")
     .upsert(

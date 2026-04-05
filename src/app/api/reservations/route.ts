@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 
+interface UserMetadata {
+  full_name?: string;
+  name?: string;
+  role?: string;
+}
 export async function GET() {
   const supabase = await createServerSupabaseClient();
   // getUser() sẽ tự động làm mới session và gọi setAll() nếu cần
@@ -85,15 +90,15 @@ export async function POST(request: Request) {
 
   const qrCode = randomUUID();
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-
+  const metadata = user.user_metadata as UserMetadata;
   // Đảm bảo user tồn tại trong bảng public.users để tránh lỗi Foreign Key
   const { error: userSyncError } = await supabase
     .from("users")
     .upsert({
       id: user.id,
       email: user.email,
-      full_name: (user.user_metadata as any)?.full_name ?? (user.user_metadata as any)?.name ?? null,
-      role: (user.user_metadata as any)?.role ?? 'buyer'
+      full_name: metadata?.full_name ?? metadata?.name ?? null,
+      role: metadata?.role ?? 'buyer',
     }, { onConflict: 'id' });
 
   if (userSyncError) {

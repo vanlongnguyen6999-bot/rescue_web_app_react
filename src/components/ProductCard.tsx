@@ -27,17 +27,19 @@ export function ProductCard({ product }: ProductCardProps) {
           label: "CẬN DATE",
           className: "bg-emerald-500 text-white",
         };
-
+  const imageSrc = product.image_url 
+    ? (product.image_url.startsWith('http') ? product.image_url : `/${product.image_url}`)
+    : null;
   return (
     <Link
-      href={`/deal/${product.id}`}
+      href={`/product/${product.id}`}
       className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-md transition hover:-translate-y-1 hover:shadow-lg"
     >
       <div className="relative h-40 w-full overflow-hidden">
-        {product.image_url ? (
+        {imageSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={product.image_url}
+            src={imageSrc}
             alt={product.name}
             className="h-full w-full object-cover"
           />

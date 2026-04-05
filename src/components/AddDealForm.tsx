@@ -69,21 +69,24 @@ export function AddDealForm({ storeId, onCreated }: AddDealFormProps) {
         const fileExt = imageFile.name.split(".").pop();
         const filePath = `${storeId}/${Date.now()}.${fileExt}`;
 
+        // SỬA TÊN BUCKET TẠI ĐÂY: image-products
         const { error: uploadError } = await supabase.storage
-          .from("product-images")
+          .from("image-products")
           .upload(filePath, imageFile, {
             cacheControl: "3600",
-            upsert: false,
+            upsert: true, // Để true để tránh lỗi nếu trùng tên file
           });
 
         if (uploadError) {
-          setError("Không thể upload ảnh sản phẩm.");
+          console.error("Lỗi Storage:", uploadError.message);
+          setError(`Lỗi upload ảnh: ${uploadError.message}`);
           setLoading(false);
           return;
         }
 
+        // LẤY URL CÔNG KHAI TỪ BUCKET: image-products
         const { data: publicUrlData } = supabase.storage
-          .from("product-images")
+          .from("image-products")
           .getPublicUrl(filePath);
 
         image_url = publicUrlData?.publicUrl ?? null;
@@ -98,17 +101,17 @@ export function AddDealForm({ storeId, onCreated }: AddDealFormProps) {
         sale_price: salePrice,
         quantity,
         expiry_date: expiryDate,
-        // Thời gian bán và giờ nhận hàng: lưu tạm vào created_at / is_active nếu cần,
-        // hoặc thêm cột riêng trong DB nếu nhóm mở rộng schema.
       });
 
       if (insertError) {
+        console.error("Lỗi Database:", insertError.message);
         setError("Không thể tạo deal mới.");
         setLoading(false);
         return;
       }
 
-      setSuccess("Đã đăng deal!");
+      setSuccess("Đã đăng deal thành công!");
+      // Reset form
       setName("");
       setImageFile(null);
       setImagePreview(null);
@@ -119,7 +122,8 @@ export function AddDealForm({ storeId, onCreated }: AddDealFormProps) {
       setPickupTime("");
       setSaleTime("");
       onCreated?.();
-    } catch {
+    } catch (err) {
+      console.error("Lỗi hệ thống:", err);
       setError("Có lỗi xảy ra. Vui lòng thử lại.");
     } finally {
       setLoading(false);
@@ -133,27 +137,27 @@ export function AddDealForm({ storeId, onCreated }: AddDealFormProps) {
     >
       <h2 className="text-base font-bold text-gray-900">Tạo deal Flash Sale</h2>
 
+      {/* Tên sản phẩm */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-gray-700">
-          Tên sản phẩm
-        </label>
+        <label className="text-xs font-medium text-gray-700">Tên sản phẩm</label>
         <input
           type="text"
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[#FF6B00] focus:outline-none focus:ring-1 focus:ring-[#FF6B00]"
-          placeholder="Combo cuối ngày siêu hời..."
+          placeholder="Combo bánh mì pate dân tổ..."
         />
       </div>
 
+      {/* Loại deal */}
       <div className="space-y-2">
         <label className="text-xs font-medium text-gray-700">Loại deal</label>
         <div className="flex gap-2 text-xs font-semibold">
           <button
             type="button"
             onClick={() => setCategory("flash_sale")}
-            className={`flex-1 rounded-2xl border px-3 py-2 ${
+            className={`flex-1 rounded-2xl border px-3 py-2 transition-colors ${
               category === "flash_sale"
                 ? "border-transparent bg-[#FF6B00] text-white"
                 : "border-gray-200 bg-orange-50 text-[#FF6B00]"
@@ -164,7 +168,7 @@ export function AddDealForm({ storeId, onCreated }: AddDealFormProps) {
           <button
             type="button"
             onClick={() => setCategory("grocery")}
-            className={`flex-1 rounded-2xl border px-3 py-2 ${
+            className={`flex-1 rounded-2xl border px-3 py-2 transition-colors ${
               category === "grocery"
                 ? "border-transparent bg-emerald-500 text-white"
                 : "border-gray-200 bg-emerald-50 text-emerald-600"
@@ -175,12 +179,11 @@ export function AddDealForm({ storeId, onCreated }: AddDealFormProps) {
         </div>
       </div>
 
+      {/* Ảnh sản phẩm */}
       <div className="space-y-2">
-        <label className="text-xs font-medium text-gray-700">
-          Ảnh sản phẩm
-        </label>
+        <label className="text-xs font-medium text-gray-700">Ảnh sản phẩm</label>
         <div className="flex items-center gap-3">
-          <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-2xl bg-orange-50 text-xs text-[#FF6B00]">
+          <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-2xl border-2 border-dashed border-orange-200 bg-orange-50 text-xs text-[#FF6B00] hover:bg-orange-100 transition-colors">
             + Ảnh
             <input
               type="file"
@@ -190,8 +193,7 @@ export function AddDealForm({ storeId, onCreated }: AddDealFormProps) {
             />
           </label>
           {imagePreview && (
-            <div className="h-20 w-20 overflow-hidden rounded-2xl border border-orange-100">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+            <div className="h-20 w-20 overflow-hidden rounded-2xl border border-orange-100 shadow-sm">
               <img
                 src={imagePreview}
                 alt="Preview"
@@ -202,75 +204,64 @@ export function AddDealForm({ storeId, onCreated }: AddDealFormProps) {
         </div>
       </div>
 
+      {/* Giá cả */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <label className="text-xs font-medium text-gray-700">
-            Giá gốc (VNĐ)
-          </label>
+          <label className="text-xs font-medium text-gray-700">Giá gốc (VNĐ)</label>
           <input
             type="number"
             min={1000}
+            required
             value={originalPrice}
-            onChange={(e) =>
-              setOriginalPrice(
-                e.target.value ? Number(e.target.value) : ""
-              )
-            }
+            onChange={(e) => setOriginalPrice(e.target.value ? Number(e.target.value) : "")}
             className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[#FF6B00] focus:outline-none focus:ring-1 focus:ring-[#FF6B00]"
           />
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium text-gray-700">
-            Giá giảm (VNĐ)
-          </label>
+          <label className="text-xs font-medium text-gray-700">Giá giảm (VNĐ)</label>
           <input
             type="number"
             min={1000}
+            required
             value={salePrice}
-            onChange={(e) =>
-              setSalePrice(e.target.value ? Number(e.target.value) : "")
-            }
+            onChange={(e) => setSalePrice(e.target.value ? Number(e.target.value) : "")}
             className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[#FF6B00] focus:outline-none focus:ring-1 focus:ring-[#FF6B00]"
           />
         </div>
       </div>
 
       {discountPercent !== null && (
-        <div className="rounded-xl bg-orange-50 px-3 py-2 text-xs text-[#FF6B00]">
-          Tiết kiệm khoảng{" "}
-          <span className="font-semibold">{discountPercent}%</span> so với giá
-          gốc
+        <div className="rounded-xl bg-orange-50 px-3 py-2 text-xs font-bold text-[#FF6B00] animate-pulse">
+          Tiết kiệm khoảng <span>{discountPercent}%</span> so với giá gốc
         </div>
       )}
 
+      {/* Số lượng */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-gray-700">Số lượng</label>
-        <div className="flex items-center gap-3">
+        <label className="text-xs font-medium text-gray-700">Số lượng suất</label>
+        <div className="flex items-center gap-4">
           <button
             type="button"
             onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-50 text-lg text-[#FF6B00]"
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-xl font-bold text-[#FF6B00] active:scale-90 transition-transform"
           >
             −
           </button>
-          <span className="w-8 text-center text-base font-semibold">
-            {quantity}
-          </span>
+          <span className="text-lg font-black text-[#0F172A] w-6 text-center">{quantity}</span>
           <button
             type="button"
             onClick={() => setQuantity((q) => q + 1)}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FF6B00] text-lg text-white"
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FF6B00] text-xl font-bold text-white shadow-lg shadow-orange-200 active:scale-90 transition-transform"
           >
             +
           </button>
         </div>
       </div>
 
+      {/* Thời gian */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <label className="text-xs font-medium text-gray-700">
-            Thời gian bán (date+time)
-          </label>
+          <label className="text-xs font-medium text-gray-700">Bắt đầu bán</label>
           <input
             type="datetime-local"
             value={saleTime}
@@ -279,9 +270,7 @@ export function AddDealForm({ storeId, onCreated }: AddDealFormProps) {
           />
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium text-gray-700">
-            Giờ khách đến nhận
-          </label>
+          <label className="text-xs font-medium text-gray-700">Hạn nhận hàng</label>
           <input
             type="time"
             value={pickupTime}
@@ -292,9 +281,7 @@ export function AddDealForm({ storeId, onCreated }: AddDealFormProps) {
       </div>
 
       <div className="space-y-1">
-        <label className="text-xs font-medium text-gray-700">
-          Hạn sử dụng
-        </label>
+        <label className="text-xs font-medium text-gray-700">Hạn sử dụng sản phẩm</label>
         <input
           type="date"
           required
@@ -304,28 +291,21 @@ export function AddDealForm({ storeId, onCreated }: AddDealFormProps) {
         />
       </div>
 
-      {error && (
-        <div className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-600">
-          {success}
-        </div>
-      )}
+      {/* Thông báo lỗi/thành công */}
+      {error && <div className="rounded-xl bg-red-50 p-3 text-xs text-red-600 font-medium border border-red-100">{error}</div>}
+      {success && <div className="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-600 font-bold border border-emerald-100">🎉 {success}</div>}
 
       <button
         type="submit"
         disabled={loading}
-        className="flex w-full items-center justify-center rounded-xl bg-[#FF6B00] py-2 text-sm font-semibold text-white shadow-md shadow-orange-200 disabled:cursor-not-allowed disabled:opacity-70"
+        className="flex w-full items-center justify-center rounded-2xl bg-[#FF6B00] py-4 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-orange-200 hover:brightness-110 active:scale-[0.98] transition-all disabled:cursor-not-allowed disabled:opacity-70"
       >
-        {loading && (
-          <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+        {loading ? (
+          <span className="h-5 w-5 animate-spin rounded-full border-3 border-white border-t-transparent" />
+        ) : (
+          "Đăng deal ngay"
         )}
-        Đăng deal
       </button>
     </form>
   );
 }
-

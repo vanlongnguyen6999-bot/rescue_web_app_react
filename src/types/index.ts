@@ -6,10 +6,11 @@ export interface Store {
   id: string;
   name: string;
   address: string | null;
-  lat: number | null;
-  lng: number | null;
+  lat: number;
+  lng: number;
   opening_hours: string | null;
   business_type: string | null;
+  image_url: string | null;
 }
 
 export interface Product {
@@ -24,6 +25,7 @@ export interface Product {
   is_active: boolean;
   created_at: string;
   store: Store;
+  description: string | null;
 }
 
 

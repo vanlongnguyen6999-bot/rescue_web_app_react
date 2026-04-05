@@ -1,133 +1,76 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabaseServer";
+import { createClient } from "@supabase/supabase-js";
 
-export async function PATCH(request: Request) {
-  const supabase = await createServerSupabaseClient();
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
-
-  // Lớp bảo vệ: Chỉ cho phép store_owner truy cập
-  const userRole = (user.user_metadata as any)?.role;
-  if (userRole !== 'store_owner') {
-    return NextResponse.json(
-      { message: "Chỉ chủ cửa hàng mới có quyền thực hiện hành động này." },
-      { status: 403 }
-    );
-  }
-
-  const body = await request.json().catch(() => null);
-
-  if (!body?.qr_code) {
-    return NextResponse.json(
-      { message: "Thiếu mã QR" },
-      { status: 400 }
-    );
-  }
-
-  const qrCode = String(body.qr_code);
-  console.log(`[CONFIRM] Received QR Code to confirm: ${qrCode}`);
-
-  // Lấy cửa hàng của user
-  const { data: store, error: storeError } = await supabase
-    .from("stores")
-    .select("id")
-    .eq("owner_id", user.id)
-    .maybeSingle();
-
-  if (storeError || !store) {
-    return NextResponse.json(
-      { message: "Bạn chưa có cửa hàng" },
-      { status: 400 }
-    );
-  }
-
-  const { data: reservation, error: reservationError } = await supabase
-    .from("reservations")
-    .select(
-      `
-      id,
-      status,
-      quantity,
-      expires_at,
-      users:users (
-        full_name,
-        email
-      ),
-      products:products (
-        id,
-        name,
-        store_id
-      )
-    `
-    )
-    .ilike("qr_code", `${qrCode.trim()}%`)
-    .maybeSingle();
-
-  if (reservationError || !reservation) {
-    console.error(`[CONFIRM] QR Code not found in database: ${qrCode}`, reservationError);
-    return NextResponse.json(
-      { message: "Mã không hợp lệ" },
-      { status: 404 }
-    );
-  }
-
-  // Sửa lỗi TypeScript: Ép kiểu dữ liệu trả về từ Supabase
-  const product = Array.isArray(reservation.products) ? (reservation.products[0] as any) : (reservation.products as any);
-  const user_detail = Array.isArray(reservation.users) ? (reservation.users[0] as any) : (reservation.users as any);
-
-  if (!product || product.store_id !== store.id) {
-    return NextResponse.json(
-      { message: "Mã này không thuộc cửa hàng của bạn" },
-      { status: 403 }
-    );
-  }
-
-  if (reservation.status !== "Reserved") {
-    return NextResponse.json(
-      { message: "Mã này đã được sử dụng" },
-      { status: 400 }
-    );
-  }
-
-  if (reservation.expires_at) {
-    const exp = new Date(reservation.expires_at);
-    if (exp.getTime() <= Date.now()) {
-      return NextResponse.json(
-        { message: "Mã này đã hết hạn" },
-        { status: 400 }
-      );
-    }
-  }
-
-  const { error: updateError } = await supabase
-    .from("reservations")
-    .update({ status: "Completed" })
-    .eq("id", reservation.id);
-
-  if (updateError) {
-    return NextResponse.json(
-      { message: "Không thể xác nhận đơn" },
-      { status: 500 }
-    );
-  }
-
-  return NextResponse.json(
-    {
-      id: reservation.id,
-      status: "Completed",
-      quantity: reservation.quantity,
-      expires_at: reservation.expires_at,
-      users: user_detail,
-      products: product,
-    },
-    { status: 200 }
-  );
+interface ProductInfo {
+  id: string;
+  name: string;
+  store_id: string;
+}
+interface ReservationRow {
+  id: string;
+  status: string;
+  quantity: number;
+  expires_at: string;
+  user_id: string;
+  products: ProductInfo | ProductInfo[] | null;
 }
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json().catch(() => null);
+    const qrCodeInput: string | undefined = body?.qrCode || body?.qr_code;
+    if (!qrCodeInput) {
+      return NextResponse.json({ message: "Thiếu mã QR" }, { status: 400 });
+    }
+
+    const formattedCode = qrCodeInput.trim().toUpperCase();
+    const { data, error: findError } = await supabase
+      .from("reservations")
+      .select(`
+        id, status, quantity, expires_at, user_id,
+        products:products (id, name, store_id)
+      `)
+      .eq("qr_code", formattedCode)
+      .single();
+
+    const reservation = data as unknown as ReservationRow;
+    if (findError || !reservation) {
+      return NextResponse.json({ message: "Mã nhận hàng không tồn tại" }, { status: 404 });
+    }
+    const currentStatus = reservation.status.toLowerCase();
+    if (currentStatus === "completed" || currentStatus === "success") {
+      return NextResponse.json({ message: "Mã này đã được xác nhận trước đó" }, { status: 400 });
+    }
+    const { error: updateError } = await supabase
+      .from("reservations")
+      .update({ status: "Completed" })
+      .eq("id", reservation.id);
+    if (updateError) throw updateError;
+
+    const productData = Array.isArray(reservation.products) 
+      ? reservation.products[0] 
+      : reservation.products;
+    try {
+      await supabase.from("notifications").insert({
+        user_id: reservation.user_id,
+        title: "Giao dịch thành công!",
+        message: `Món "${productData?.name || 'Sản phẩm'}" đã được xác nhận. Chúc bạn ngon miệng!`
+      });
+    } catch (notifErr) {
+      console.error("Lỗi gửi thông báo (không chặn luồng chính):", notifErr);
+    }
+    return NextResponse.json({
+      product_name: productData?.name || "Sản phẩm không tên",
+      quantity: reservation.quantity,
+      status: "Completed"
+    }, { status: 200 });
+  } catch (err) {
+    console.error("Lỗi API Confirm:", err);
+    return NextResponse.json({ message: "Lỗi hệ thống khi xử lý mã" }, { status: 500 });
+  }
+}
