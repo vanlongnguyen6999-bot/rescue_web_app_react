@@ -85,7 +85,6 @@ export default function SettingsPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#FCFAF8]">
-      {/* HEADER - STYLE CREAM */}
       <header className="sticky top-0 z-50 flex h-[70px] items-center justify-between border-b border-[rgba(255,106,0,0.1)] bg-[#FFF4DD] px-4">
         <button
           type="button"
@@ -102,7 +101,6 @@ export default function SettingsPage() {
 
       <main className="flex-1 px-4 py-6">
         <form onSubmit={handleUpdateProfile} className="space-y-5">
-          {/* EMAIL - READ ONLY */}
           <div className="space-y-2">
             <label className="ml-1 text-[11px] font-bold uppercase tracking-wider text-[#64748B]">
               Địa chỉ Email
@@ -111,8 +109,6 @@ export default function SettingsPage() {
               {email}
             </div>
           </div>
-
-          {/* HỌ VÀ TÊN */}
           <div className="space-y-2">
             <label className="ml-1 text-[11px] font-bold uppercase tracking-wider text-[#64748B]">
               Họ và tên
@@ -127,7 +123,6 @@ export default function SettingsPage() {
             />
           </div>
 
-          {/* SỐ ĐIỆN THOẠI */}
           <div className="space-y-2">
             <label className="ml-1 text-[11px] font-bold uppercase tracking-wider text-[#64748B]">
               Số điện thoại
@@ -141,7 +136,6 @@ export default function SettingsPage() {
             />
           </div>
 
-          {/* THÔNG BÁO */}
           {message && (
             <div className={`rounded-2xl border px-4 py-3 text-xs font-bold ${
               message.type === 'success' 
@@ -151,8 +145,6 @@ export default function SettingsPage() {
               {message.type === 'success' ? '✅ ' : '⚠️ '} {message.text}
             </div>
           )}
-
-          {/* NÚT LƯU */}
           <button
             type="submit"
             disabled={saving}
@@ -168,11 +160,8 @@ export default function SettingsPage() {
             )}
           </button>
         </form>
-
-        {/* SECTION MẸO NHỎ VỚI ICON BÓNG ĐÈN */}
         <div className="mt-10 rounded-2xl border border-[rgba(255,106,0,0.1)] bg-[rgba(255,106,0,0.05)] p-5">
           <div className="mb-2 flex items-center gap-2">
-            {/* ICON BÓNG ĐÈN CHUẨN CỦA LONG */}
             <svg 
               width="18" 
               height="18" 

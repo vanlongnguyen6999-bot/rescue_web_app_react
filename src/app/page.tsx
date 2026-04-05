@@ -179,7 +179,7 @@ function HomeContent() {
                   filter === t ? "bg-[#FF6A00] text-white shadow-lg" : "bg-white text-[#94A3B8] border border-[#F1F5F9]"
                 }`}
               >
-                {t === "all" ? "Tất cả" : t === "flash_sale" ? "Flash Sale 🔥" : "Cận date 📉"}
+                {t === "all" ? "Tất cả" : t === "flash_sale" ? "Flash Sale " : "Cận date "}
               </button>
             ))}
           </div>
@@ -191,7 +191,7 @@ function HomeContent() {
                 onClick={() => setViewMode(v => v === 'list' ? 'map' : 'list')}
                 className="text-[10px] font-black text-[#FF6A00] bg-[#FF6A001a] px-4 py-2 rounded-xl uppercase"
               >
-                {viewMode === 'list' ? "📍 Xem bản đồ" : "📋 Danh sách"}
+                {viewMode === 'list' ? " Xem bản đồ" : " Danh sách"}
               </button>
             </div>
 
