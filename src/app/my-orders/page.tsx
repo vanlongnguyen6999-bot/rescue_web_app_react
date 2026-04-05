@@ -142,8 +142,6 @@ export default function MyOrdersPage() {
         <div style={{ fontSize: '16px', fontWeight: 900, color: '#0F172A', textTransform: 'uppercase' }}>Đơn hàng của tôi</div>
         <div style={{ width: '24px' }} />
       </header>
-
-      {/* TABS */}
       <div style={{ display: 'flex', background: 'white', borderBottom: '1px solid #F1F5F9', position: 'sticky', top: '70px', zIndex: 99 }}>
         <button onClick={() => setActiveTab("ongoing")} style={{ flex: 1, padding: '16px 0', fontSize: '11px', fontWeight: 900, color: activeTab === 'ongoing' ? '#FF6A00' : '#94A3B8', border: 'none', background: 'none', borderBottom: activeTab === 'ongoing' ? '3px solid #FF6A00' : '3px solid transparent' }}>CHỜ LẤY</button>
         <button onClick={() => setActiveTab("completed")} style={{ flex: 1, padding: '16px 0', fontSize: '11px', fontWeight: 900, color: activeTab === 'completed' ? '#FF6A00' : '#94A3B8', border: 'none', background: 'none', borderBottom: activeTab === 'completed' ? '3px solid #FF6A00' : '3px solid transparent' }}>LỊCH SỬ</button>

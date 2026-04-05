@@ -132,7 +132,7 @@ function HomeContent() {
     <div className="flex min-h-screen w-full flex-col bg-[#FCFAF8] font-sans text-[#0F172A] relative overflow-x-hidden">
       
       {/* --- HEADER --- */}
-      <header className="sticky top-0 z-30 border-b border-[#F1F5F9] bg-white/95 p-4 backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b border-[#F1F5F9] bg-white/95 p-4 backdrop-blur-md justifyContent: 'center'">
         <div className="flex items-center justify-between gap-4 mb-3">
           <div className="flex items-center gap-1 overflow-hidden max-w-[180px]">
             <span className="text-[#FF6A00]">
@@ -143,7 +143,7 @@ function HomeContent() {
             </span>
             <svg width="7" height="5" viewBox="0 0 7 5" fill="none" className="ml-0.5"><path d="M3.5 4.31667L0 0.816667L0.816667 0L3.5 2.68333L6.18333 0L7 0.816667L3.5 4.31667Z" fill="#64748B"/></svg>
           </div>
-          <div className="text-[1.25rem] font-black text-[#FF6A00] tracking-tighter">EcoEat</div>
+           <div className= "text-align-center text-[2.0rem] font-black text-[#FF6A00] tracking-tighter">EcoEat</div>
           <button className="relative p-1">
             <svg width="16" height="20" viewBox="0 0 16 20" fill="none"><path d="M0 17V15H2V8C2 6.61667 2.41667 5.3875 3.25 4.3125C4.08333 3.2375 5.16667 2.53333 6.5 2.2V1.5C6.5 1.08333 6.64583 0.729167 6.9375 0.4375C7.22917 0.145833 7.58333 0 8 0C8.41667 0 8.77083 0.145833 9.0625 0.4375C9.35417 0.729167 9.5 1.08333 9.5 1.5V2.2C10.8333 2.53333 11.9167 3.2375 12.75 4.3125C13.5833 5.3875 14 6.61667 14 8V15H16V17H0ZM8 20C7.45 20 6.97917 19.8042 6.5875 19.4125C6.19583 19.0208 6 18.55 6 18H10C10 18.55 9.80417 19.0208 9.4125 19.4125C9.02083 19.8042 8.55 20 8 20ZM4 15H12V8C12 6.9 11.6083 5.95833 10.825 5.175C10.0417 4.39167 9.1 4 8 4C6.9 4 5.95833 4.39167 5.175 5.175C4.39167 5.95833 4 6.9 4 8V15Z" fill="#0F172A"/></svg>
             <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500 border border-white"></span>
@@ -186,7 +186,7 @@ function HomeContent() {
 
           <section className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-black text-[#0F172A] uppercase tracking-tight">Deal Hời Giải Cứu</h2>
+              <h2 className="text-lg font-black text-[#0F172A] uppercase tracking-tight">Deal Sốc</h2>
               <button 
                 onClick={() => setViewMode(v => v === 'list' ? 'map' : 'list')}
                 className="text-[10px] font-black text-[#FF6A00] bg-[#FF6A001a] px-4 py-2 rounded-xl uppercase"

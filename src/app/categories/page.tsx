@@ -107,19 +107,19 @@ function CategoriesContent() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <section onClick={() => setSelectedCategory('flash_sale')} style={{ padding: '24px', borderRadius: '24px', background: 'linear-gradient(135deg, #FF6A00 0%, #EA580C 100%)', color: 'white', cursor: 'pointer', boxShadow: '0 10px 20px rgba(255, 106, 0, 0.2)' }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', background: 'rgba(255,255,255,0.2)', padding: '6px 12px', borderRadius: '20px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Flash Sale Sau 20:00
+                  URGEN Sau 20:00
                 </div>
-                <h2 style={{ fontSize: '24px', fontWeight: 900, marginTop: '12px' }}>Cứu đói Đêm khuya</h2>
-                <p style={{ opacity: 0.9, fontSize: '13px', marginBottom: '20px', fontWeight: 500 }}>Ready-to-eat • Giảm sập sàn 70%</p>
+                <h2 style={{ fontSize: '24px', fontWeight: 900, marginTop: '12px' }}>Flash-Sale Cuối Ngày</h2>
+                <p style={{ opacity: 0.9, fontSize: '13px', marginBottom: '20px', fontWeight: 500 }}>Ready-to-eat • Giảm 50-70%</p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700 }}>Chỉ còn tối nay</span>
+                    <span style={{ fontSize: '11px', fontWeight: 700 }}>Giải cứu ngay để tránh lãng phí</span>
                     <div style={{ background: 'white', color: '#FF6A00', padding: '8px 20px', borderRadius: '12px', fontWeight: 900, fontSize: '13px' }}>XEM NGAY</div>
                 </div>
             </section>
             <section onClick={() => setSelectedCategory('grocery')} style={{ background: 'white', padding: '24px', borderRadius: '24px', border: '1px solid #f1f5f9', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-                <span style={{ color: '#FF6B00', fontSize: '10px', fontWeight: 900, background: '#FFF4DD', padding: '6px 12px', borderRadius: '8px', textTransform: 'uppercase' }}>Hàng Bách Hóa</span>
-                <h2 style={{ fontSize: '22px', fontWeight: 900, marginTop: '12px', color: '#0F172A' }}>Kho Bách Hóa Cận Date</h2>
-                <p style={{ fontSize: '13px', color: '#64748B', marginTop: '4px', fontWeight: 500 }}>Sữa, đồ đóng hộp • Date &lt; 7 ngày</p>
+                <span style={{ color: '#FF6B00', fontSize: '10px', fontWeight: 900, background: '#FFF4DD', padding: '6px 12px', borderRadius: '8px', textTransform: 'uppercase' }}>Hot Deal</span>
+                <h2 style={{ fontSize: '22px', fontWeight: 900, marginTop: '12px', color: '#0F172A' }}>Gian hàng cận Date</h2>
+                <p style={{ fontSize: '13px', color: '#64748B', marginTop: '4px', fontWeight: 500 }}>Sữa, đồ hộp bách hoá • HSD &lt; 7 ngày</p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
                     <div style={{ display: 'flex' }}>
                         {[1, 2, 3].map((i) => (
@@ -128,7 +128,10 @@ function CategoriesContent() {
                            </div>
                         ))}
                     </div>
-                    <span style={{ color: '#FF6B00', fontWeight: 900, fontSize: '13px' }}>KHÁM PHÁ ›</span>
+                    <span style={{ color: '#FF6B00', fontWeight: 900, fontSize: '13px' , display: 'flex', alignItems: 'center', gap: '4px' }}>Xem thêm <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M7.10208 5.25H0V4.08333H7.10208L3.83542 0.816667L4.66667 0L9.33333 4.66667L4.66667 9.33333L3.83542 8.51667L7.10208 5.25Z" fill="#FF6A00"/>
+</svg>
+</span>
                 </div>
             </section>
             <section>

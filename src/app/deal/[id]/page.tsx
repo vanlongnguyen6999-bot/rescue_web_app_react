@@ -158,7 +158,7 @@ export default function DealDetailPage() {
       {reservation && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
           <div style={{ background: 'white', width: '100%', maxWidth: '400px', borderRadius: '32px', padding: '32px', textAlign: 'center' }}>
-            <h3 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '24px' }}>Giữ chỗ thành công! ✅</h3>
+            <h3 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '24px' }}>Giữ chỗ thành công! </h3>
             <div style={{ padding: '24px', background: '#F8F7F5', borderRadius: '24px', marginBottom: '24px' }}>
                 <QRCode value={reservation.qr_code} size={180} style={{ margin: '0 auto' }} />
                 <div style={{ marginTop: '16px', fontWeight: 900, color: '#FF6A00', fontSize: '18px' }}>{reservation.qr_code.toUpperCase()}</div>

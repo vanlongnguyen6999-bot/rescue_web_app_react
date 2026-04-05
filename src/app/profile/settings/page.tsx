@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-// Định nghĩa interface để sạch bóng any
 interface UserMetadata {
   role?: string;
   full_name?: string;
