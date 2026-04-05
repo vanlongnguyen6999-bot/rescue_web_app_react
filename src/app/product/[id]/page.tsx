@@ -13,7 +13,6 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [isReserving, setIsReserving] = useState(false);
 
-  // 1. Lấy dữ liệu chi tiết từ Supabase
   useEffect(() => {
     const fetchDetail = async () => {
       const { data, error } = await supabase
@@ -30,31 +29,25 @@ export default function ProductDetailPage() {
     };
     fetchDetail();
   }, [id]);
-
-  // 2. Logic Đặt chỗ (Lưu vào bảng reservations)
   const handleReserve = async () => {
   if (!product || product.quantity <= 0) return;
 
   setIsReserving(true);
   try {
-    // 1. Lấy thông tin session hiện tại một cách an toàn
     const { data: { session }, error: authError } = await supabase.auth.getSession();
-    
     if (authError || !session?.user) {
       alert("Vui lòng đăng nhập để thực hiện đặt chỗ!");
       router.push("/auth");
       return;
     }
 
-    const userId = session.user.id; // <--- ĐÂY CHÍNH LÀ ID NGƯỜI MUA HIỆN TẠI
+    const userId = session.user.id;
     const qrCode = `ECO-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
-    
-    // 2. Chèn vào bảng reservations với ID thật
     const { data: newReservation, error: resError } = await supabase
       .from("reservations")
       .insert([{
         product_id: product.id,
-        user_id: userId, // <--- Dùng biến userId vừa lấy được
+        user_id: userId,
         quantity: 1,
         status: 'Reserved',
         qr_code: qrCode,
@@ -64,8 +57,6 @@ export default function ProductDetailPage() {
       .single();
 
     if (resError) throw resError;
-
-    // 3. Giảm số lượng trong kho
     await supabase
       .from("products")
       .update({ quantity: product.quantity - 1 })
@@ -92,15 +83,12 @@ export default function ProductDetailPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#FFF5E2] pb-24 relative">
-      {/* Nút Quay lại */}
       <button 
         onClick={() => router.back()} 
         className="fixed top-4 left-4 z-40 rounded-full bg-white/90 p-2 shadow-lg backdrop-blur-md active:scale-90 transition-transform"
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-
-      {/* Ảnh bìa */}
       <div className="h-[40vh] w-full">
         <img 
           src={product.image_url?.startsWith('http') ? product.image_url : `/${product.image_url}`} 
@@ -108,8 +96,6 @@ export default function ProductDetailPage() {
           alt={product.name}
         />
       </div>
-
-      {/* Thông tin chi tiết */}
       <main className="flex-1 p-5 -mt-8 relative z-10 bg-[#FFF5E2] rounded-t-[32px] shadow-2xl">
         <div className="flex justify-between items-start mb-2">
           <span className="text-[10px] font-black text-white bg-[#FF6A00] px-3 py-1 rounded-full uppercase">
@@ -124,8 +110,6 @@ export default function ProductDetailPage() {
           <span className="text-3xl font-black text-[#FF6A00]">{product.sale_price.toLocaleString()}đ</span>
           <span className="text-lg text-gray-400 line-through">{product.original_price.toLocaleString()}đ</span>
         </div>
-
-        {/* Card Cửa hàng */}
         <div className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-[#E2E8F0] mb-6">
           <div className="h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center font-bold text-[#FF6A00]">
             {product.store?.name?.charAt(0)}
@@ -144,9 +128,6 @@ export default function ProductDetailPage() {
           </p>
         </div>
       </main>
-
-      {/* Thanh đặt chỗ cố định */}
-      {/* Sửa lại lỗi cú pháp: fixed bottom-[70]px -> fixed bottom-[70px] */}
       <footer className="fixed bottom-[70px] left-0 w-full bg-white/95 backdrop-blur-md p-4 border-t flex items-center gap-4 z-30">
         <div className="flex-1">
           <p className="text-[10px] font-bold text-gray-400">CÒN LẠI: {product.quantity} SUẤT</p>

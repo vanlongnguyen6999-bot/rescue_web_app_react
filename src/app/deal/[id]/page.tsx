@@ -11,8 +11,6 @@ export default function DealDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const productId = params?.id;
-
-  // --- LOGIC STATES GIỮ NGUYÊN ---
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -26,9 +24,7 @@ export default function DealDetailPage() {
     qr_code: string;
     expires_at: string;
   } | null>(null);
-
-  // --- LOGIC TIMER (LẤY TỪ SCRIPT HTML CỦA BẠN) ---
-  const [timeLeft, setTimeLeft] = useState(9 * 60 + 45); // 09:45
+  const [timeLeft, setTimeLeft] = useState(9 * 60 + 45); 
   useEffect(() => {
     if (timeLeft <= 0) return;
     const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
@@ -40,8 +36,6 @@ export default function DealDetailPage() {
     const s = seconds % 60;
     return { min: m < 10 ? `0${m}` : m, sec: s < 10 ? `0${s}` : s };
   };
-
-  // --- LOGIC FETCH DỮ LIỆU ---
   useEffect(() => {
     if (!productId) return;
     const fetchProduct = async () => {
@@ -61,8 +55,6 @@ export default function DealDetailPage() {
     };
     fetchProduct();
   }, [productId]);
-
-  // --- LOGIC GIỮ CHỖ ---
   const handleReserve = async () => {
     if (!product) return;
     const { data: { user } } = await supabase.auth.getUser();
@@ -87,8 +79,6 @@ export default function DealDetailPage() {
 
   return (
     <div style={{ backgroundColor: '#F8F7F5', minHeight: '100vh', paddingBottom: '120px' }}>
-      
-      {/* HEADER - TƯƠNG ỨNG HTML */}
       <header style={{ position: 'sticky', top: 0, height: '70px', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, borderBottom: '1px solid #F1F5F9' }}>
         <div style={{ width: '100%', maxWidth: '1000px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px' }}>
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
@@ -102,8 +92,6 @@ export default function DealDetailPage() {
       </header>
 
       <main style={{ width: '100%', maxWidth: '1000px', margin: '0 auto', padding: '24px 16px' }}>
-        
-        {/* TIMER BANNER - LẤY TỪ HTML GIOHANG */}
         <div style={{ background: '#FFF7ED', padding: '20px', borderRadius: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', marginBottom: '24px', textAlign: 'center' }}>
             <span style={{ color: '#FF6A00', fontSize: '14px', fontWeight: 600, letterSpacing: '0.5px' }}>THỜI GIAN GIỮ CHỖ CÒN LẠI</span>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
@@ -118,8 +106,6 @@ export default function DealDetailPage() {
                 </div>
             </div>
         </div>
-
-        {/* THÔNG TIN SẢN PHẨM - TƯƠNG ỨNG COMPONENT CART ITEM TRONG HTML */}
         <div style={{ background: 'white', borderRadius: '24px', padding: '24px', border: '1px solid #F1F5F9', display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
             <img src={product.image_url || ""} style={{ width: '100px', height: '100px', borderRadius: '12px', objectFit: 'cover' }} />
             <div style={{ flex: 1 }}>
@@ -132,8 +118,6 @@ export default function DealDetailPage() {
                     </span>
                 </div>
             </div>
-            
-            {/* BỘ ĐẾM SỐ LƯỢNG - CHUẨN HTML GIOHANG */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#F8F7F5', padding: '6px', borderRadius: '99px', height: 'fit-content', alignSelf: 'center' }}>
                 <button onClick={() => setQuantity(q => Math.max(1, q - 1))} style={{ width: '36px', height: '36px', borderRadius: '50%', border: 'none', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
                   <svg width="12" height="2" viewBox="0 0 12 2" fill="none"><path d="M0 1H12" stroke="#475569" strokeWidth="1.5"/></svg>
@@ -144,8 +128,6 @@ export default function DealDetailPage() {
                 </button>
             </div>
         </div>
-
-        {/* TÓM TẮT ĐƠN HÀNG - LẤY TỪ SUMMARY SECTION HTML */}
         <div style={{ background: 'white', padding: '24px', borderRadius: '24px', border: '1px solid #F1F5F9', marginTop: '24px' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '20px' }}>Chi tiết giải cứu</h3>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '15px' }}>
@@ -162,8 +144,6 @@ export default function DealDetailPage() {
             </div>
         </div>
       </main>
-
-      {/* NÚT CHỐT ĐƠN - TƯƠNG ỨNG BTN-CHECKOUT HTML */}
       <div style={{ position: 'fixed', bottom: 0, left: 0, width: '100%', background: 'white', padding: '20px', borderTop: '1px solid #F1F5F9', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {actionError && <div style={{ color: '#EF4444', fontSize: '12px', textAlign: 'center', fontWeight: 600 }}>{actionError}</div>}
         <button 
@@ -175,8 +155,6 @@ export default function DealDetailPage() {
           {submitting ? "Đang xử lý..." : "Giữ chỗ & Thanh toán tại quầy"}
         </button>
       </div>
-
-      {/* QR MODAL (KẾT QUẢ THÀNH CÔNG) */}
       {reservation && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
           <div style={{ background: 'white', width: '100%', maxWidth: '400px', borderRadius: '32px', padding: '32px', textAlign: 'center' }}>

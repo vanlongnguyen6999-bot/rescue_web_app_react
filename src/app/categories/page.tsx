@@ -7,7 +7,6 @@ import { Product, Store } from "@/types";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-// --- INTERFACES & FETCHER (GIỮ NGUYÊN LOGIC CỦA LONG) ---
 interface RawProductResponse extends Product {
   stores: Store[] | Store;
 }

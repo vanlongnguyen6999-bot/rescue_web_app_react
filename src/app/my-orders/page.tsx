@@ -113,8 +113,6 @@ export default function MyOrdersPage() {
 
   return (
     <div style={{ backgroundColor: '#FCFAF8', minHeight: '100vh', paddingBottom: '100px', fontFamily: 'sans-serif' }}>
-      
-      {/* POPUP MÃ QR TO ĐỂ DEMO */}
       {showQR && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', padding: '20px' }}>
           <div style={{ backgroundColor: 'white', borderRadius: '32px', padding: '32px', width: '100%', maxWidth: '340px', textAlign: 'center', position: 'relative' }}>
@@ -137,7 +135,6 @@ export default function MyOrdersPage() {
         </div>
       )}
 
-      {/* HEADER */}
       <header style={{ position: 'sticky', top: 0, height: '70px', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', borderBottom: '1px solid #F1F5F9', zIndex: 100 }}>
         <button onClick={() => router.back()} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2.5"><path d="M15 18l-6-6 6-6"/></svg>
@@ -199,8 +196,6 @@ export default function MyOrdersPage() {
           ))
         )}
       </main>
-
-      {/* BOTTOM NAV GỐC */}
       <nav style={{ position: 'fixed', bottom: 0, left: 0, width: '100%', height: '75px', background: 'white', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-around', alignItems: 'center', paddingBottom: '10px', zIndex: 1000 }}>
         <Link href="/" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: '10px', color: '#94A3B8', gap: '4px', textDecoration: 'none', flex: 1 }}>
           <svg width="24" height="24" viewBox="0 0 16 18" fill="none"><path d="M2 16H5V10H11V16H14V7L8 2.5L2 7V16ZM0 18V6L8 0L16 6V18H9V12H7V18H0Z" fill="currentColor"/></svg>
